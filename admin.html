@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Portal | PUP Akademia</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body class="admin-page">
+  <header class="admin-header">
+    <a class="admin-brand" href="index.html" aria-label="PUP Akademia user portal">
+      <span class="admin-brand-seal">PUP</span>
+      <span><strong>PUP Akademia</strong><small>Administrator portal</small></span>
+    </a>
+    <a class="admin-user-link" href="index.html">User portal</a>
+  </header>
+
+  <main class="admin-main">
+    <section id="admin-auth-panel" class="admin-panel">
+      <p class="admin-eyebrow">Restricted access</p>
+      <h1>Administrator sign in</h1>
+      <p class="admin-intro">Use your PUP institutional email. New accounts must be approved by an existing administrator.</p>
+      <form id="admin-auth-form" class="admin-auth-form">
+        <label for="admin-email">Institutional email</label>
+        <input id="admin-email" type="email" autocomplete="email" placeholder="name@iskolarngbayan.pup.edu.ph" required />
+        <div class="admin-auth-actions">
+          <button class="btn btn-primary" type="submit" data-auth-mode="login">Send login link</button>
+          <button class="btn btn-ghost" type="submit" data-auth-mode="signup">Request admin access</button>
+        </div>
+      </form>
+      <div class="admin-panel-actions admin-demo-entry">
+        <button id="admin-demo-preview" class="btn btn-ghost" type="button" hidden>Explore demo dashboard</button>
+      </div>
+      <p id="admin-auth-status" class="admin-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="admin-pending-panel" class="admin-panel" hidden>
+      <p class="admin-eyebrow">Access review</p>
+      <h1>Admin access pending</h1>
+      <p id="admin-pending-message" class="admin-intro"></p>
+      <div class="admin-panel-actions">
+        <button id="admin-pending-refresh" class="btn btn-ghost" type="button">Check status</button>
+        <button class="btn btn-ghost" type="button" data-admin-signout>Sign out</button>
+      </div>
+    </section>
+
+    <section id="admin-dashboard" class="admin-workspace" hidden>
+      <div class="admin-dashboard-head">
+        <div>
+          <p class="admin-eyebrow">PUP Akademia · Administration</p>
+          <h1 id="admin-page-title">Dashboard</h1>
+          <p class="admin-account-summary"><span id="admin-current-email" class="admin-intro"></span><span id="admin-current-role" class="admin-role-label"></span></p>
+        </div>
+        <div class="admin-panel-actions">
+          <button id="admin-refresh" class="btn btn-ghost" type="button" aria-label="Refresh admin data">Refresh</button>
+          <button class="btn btn-ghost" type="button" data-admin-signout>Sign out</button>
+        </div>
+      </div>
+      <p id="admin-demo-notice" class="admin-demo-notice" role="status" hidden>Demo preview: sample data only. Review actions are simulated in this browser and are not saved.</p>
+
+      <div class="admin-workspace-layout">
+        <nav class="admin-sidebar" aria-label="Admin sections">
+          <p class="admin-nav-label">Workspace</p>
+          <button class="admin-nav-item active" type="button" data-admin-view="overview">Dashboard</button>
+          <button class="admin-nav-item" type="button" data-admin-view="users">User management</button>
+          <button class="admin-nav-item" type="button" data-admin-view="calendar">Calendar</button>
+          <p class="admin-nav-label">Review queues</p>
+          <button class="admin-nav-item" type="button" data-admin-view="access">Admin access <span id="nav-access-count">0</span></button>
+          <button class="admin-nav-item" type="button" data-admin-view="feedback">User feedback <span id="nav-feedback-count">0</span></button>
+          <button class="admin-nav-item" type="button" data-admin-view="claims">Claim follow-ups <span id="nav-claim-count">0</span></button>
+          <button class="admin-nav-item" type="button" data-admin-view="matches">Owner matches <span id="nav-match-count">0</span></button>
+          <p class="admin-nav-label">Account</p>
+          <button class="admin-nav-item" type="button" data-admin-view="profile">Profile management</button>
+        </nav>
+
+        <div class="admin-content">
+          <section class="admin-view" data-admin-panel="overview" aria-labelledby="overview-heading">
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">At a glance</p><h2 id="overview-heading">Overview</h2></div><span id="admin-dashboard-status" class="admin-status" role="status" aria-live="polite"></span></div>
+            <div class="admin-stat-grid">
+              <article class="admin-stat"><span>Active item posts</span><strong id="overview-items">0</strong></article>
+              <article class="admin-stat"><span>Lost items</span><strong id="overview-lost">0</strong></article>
+              <article class="admin-stat"><span>Found items</span><strong id="overview-found">0</strong></article>
+              <article class="admin-stat"><span>Pending reviews</span><strong id="overview-pending">0</strong></article>
+            </div>
+            <div class="admin-overview-grid">
+              <section class="admin-section" aria-labelledby="item-chart-heading">
+                <div class="admin-section-head"><h3 id="item-chart-heading">Lost and found posts</h3><span class="admin-chart-period">Current records</span></div>
+                <div id="admin-item-chart" class="admin-chart" role="img" aria-label="Lost and found item post counts"></div>
+              </section>
+              <section class="admin-section" aria-labelledby="queue-chart-heading">
+                <div class="admin-section-head"><h3 id="queue-chart-heading">Review queue volume</h3><span class="admin-chart-period">Pending</span></div>
+                <div id="admin-queue-chart" class="admin-chart" role="img" aria-label="Pending review counts by queue"></div>
+              </section>
+            </div>
+            <section class="admin-section admin-account-section" aria-labelledby="account-metrics-heading">
+              <div class="admin-section-head"><div><h3 id="account-metrics-heading">Account activity</h3><p class="admin-view-intro">Registration and sign-in activity · trailing 30 days</p></div><span id="admin-account-metrics-source" class="admin-chart-period"></span></div>
+              <div class="admin-account-metrics">
+                <article><span>Total registered</span><strong id="admin-users-total">--</strong></article>
+                <article><span>Active · 30 days</span><strong id="admin-users-active">--</strong></article>
+                <article><span>New · 30 days</span><strong id="admin-users-new">--</strong></article>
+                <article><span>Inactive · 30+ days</span><strong id="admin-users-inactive">--</strong></article>
+                <article><span>Deleted accounts</span><strong id="admin-users-deleted">--</strong></article>
+              </div>
+              <div id="admin-user-chart" class="admin-chart admin-user-chart" role="img" aria-label="Active, inactive, and deleted account counts"></div>
+              <p id="admin-account-metrics-note" class="admin-view-note">Deleted accounts are counted from the start of activity tracking. Inactive accounts are not assumed to be deleted.</p>
+            </section>
+            <section class="admin-section" aria-labelledby="activity-heading">
+              <div class="admin-section-head"><h3 id="activity-heading">Recent activity</h3><button class="admin-text-button" type="button" data-admin-view-link="calendar">View calendar</button></div>
+              <div id="admin-recent-activity" class="admin-list"></div>
+            </section>
+            <section class="admin-section" aria-labelledby="items-heading">
+              <div class="admin-section-head"><h3 id="items-heading">Recent item posts</h3><span id="admin-item-count" class="admin-count">0</span></div>
+              <div id="admin-item-list" class="admin-list"></div>
+            </section>
+          </section>
+
+          <section class="admin-view" data-admin-panel="users" aria-labelledby="users-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Access control</p><h2 id="users-heading">User management</h2><p class="admin-view-intro">Administrator accounts and their current access level.</p></div></div>
+            <section class="admin-section" aria-labelledby="active-admins-heading">
+              <div class="admin-section-head"><h3 id="active-admins-heading">Active administrators</h3><span id="admin-user-count" class="admin-count">0</span></div>
+              <div id="admin-user-list" class="admin-list"></div>
+            </section>
+            <p id="admin-user-management-note" class="admin-view-note">Common Admins can review the administrator roster. Only Super Admins can approve access, change roles, or revoke admin access. Revoking access does not delete a user account.</p>
+          </section>
+
+          <section class="admin-view" data-admin-panel="calendar" aria-labelledby="calendar-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Submission timeline</p><h2 id="calendar-heading">Calendar</h2><p class="admin-view-intro">Submission dates from item posts and review queues.</p></div></div>
+            <section class="admin-section admin-calendar-section">
+              <div class="admin-calendar-toolbar"><button id="calendar-previous" class="admin-icon-button" type="button" aria-label="Previous month">‹</button><h3 id="calendar-month-label"></h3><button id="calendar-next" class="admin-icon-button" type="button" aria-label="Next month">›</button></div>
+              <div class="admin-calendar-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+              <div id="admin-calendar-grid" class="admin-calendar-grid"></div>
+            </section>
+            <section class="admin-section admin-calendar-events" aria-labelledby="calendar-events-heading"><div class="admin-section-head"><h3 id="calendar-events-heading">Selected date</h3><span id="calendar-selected-label" class="admin-chart-period"></span></div><div id="admin-calendar-events" class="admin-list"></div></section>
+          </section>
+
+          <section class="admin-view" data-admin-panel="access" aria-labelledby="access-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Review queue</p><h2 id="access-heading">Admin access requests</h2><p class="admin-view-intro">Review requests for administrator privileges.</p></div><span id="admin-access-count" class="admin-count">0</span></div>
+            <div id="admin-access-list" class="admin-list"></div>
+          </section>
+
+          <section class="admin-view" data-admin-panel="feedback" aria-labelledby="feedback-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Review queue</p><h2 id="feedback-heading">User feedback</h2><p class="admin-view-intro">Website and announcement reports submitted from the user portal.</p></div><span id="admin-feedback-count" class="admin-count">0</span></div>
+            <p id="admin-feedback-status" class="admin-status" role="status" aria-live="polite"></p>
+            <div id="admin-feedback-list" class="admin-list"></div>
+          </section>
+
+          <section class="admin-view" data-admin-panel="claims" aria-labelledby="claim-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Review queue</p><h2 id="claim-heading">Claim follow-ups</h2><p class="admin-view-intro">Messages from people following up on a claim.</p></div><span id="admin-claim-count" class="admin-count">0</span></div>
+            <div id="admin-claim-list" class="admin-list"></div>
+          </section>
+
+          <section class="admin-view" data-admin-panel="matches" aria-labelledby="match-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Review queue</p><h2 id="match-heading">Owner match submissions</h2><p class="admin-view-intro">Review evidence submitted to identify an item's owner.</p></div><span id="admin-match-count" class="admin-count">0</span></div>
+            <div id="admin-match-list" class="admin-list"></div>
+          </section>
+
+          <section class="admin-view" data-admin-panel="profile" aria-labelledby="profile-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Account settings</p><h2 id="profile-heading">Profile management</h2><p class="admin-view-intro">Update the display name associated with your administrator account.</p></div></div>
+            <form id="admin-profile-form" class="admin-section admin-profile-form">
+              <label for="profile-email">Institutional email</label><input id="profile-email" type="email" readonly />
+              <label for="profile-display-name">Display name</label><input id="profile-display-name" type="text" maxlength="80" autocomplete="name" required />
+              <div class="admin-profile-actions"><p id="admin-profile-status" class="admin-status" role="status" aria-live="polite"></p><button class="btn btn-primary" type="submit">Save profile</button></div>
+            </form>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="admin-details-dialog" class="admin-details-dialog" aria-labelledby="admin-details-title">
+    <div class="admin-details-header"><h2 id="admin-details-title">Record details</h2><button id="admin-details-close" class="admin-icon-button" type="button" aria-label="Close details">×</button></div>
+    <div id="admin-details-content" class="admin-details-content"></div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>

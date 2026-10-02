@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>PUP Akademia — Lost &amp; Found</title>
+<link rel="stylesheet" href="css/styles.css"/>
+</head>
+<body>
+  <!-- AUTH MODAL (Login / Sign Up) -->
+<!-- FULL-SCREEN AUTH GATE OVERLAY -->
+<div id="auth-gate" style="position: fixed; inset: 0; background: var(--maroon-dk); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: var(--card); border-radius: var(--r-xl); padding: 32px; width: 100%; max-width: 420px; box-shadow: var(--shadow-float); text-align: center;">
+    
+    <div style="width: 60px; height: 60px; background: var(--gold-lt); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 16px;">
+      PUP
+    </div>
+    
+    <h2 style="font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; color: var(--maroon); margin-bottom: 6px;">PUP Akademia</h2>
+    <p style="font-size: 13.5px; color: var(--ink-3); margin-bottom: 20px;">Lost &amp; Found Portal. Verify your official institutional email to proceed.</p>
+
+    <!-- TAB SWITCHER FOR LOGIN / SIGNUP -->
+    <div style="display: flex; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 4px; margin-bottom: 18px;">
+      <button type="button" id="tab-login" class="btn btn-sm" style="flex: 1; justify-content: center; background: var(--maroon); color: #fff;" onclick="window.switchAuthTab('login')">Log In</button>
+      <button type="button" id="tab-signup" class="btn btn-sm btn-ghost" style="flex: 1; justify-content: center; border: none;" onclick="window.switchAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <div class="field" style="text-align: left; margin-bottom: 16px;">
+      <label id="auth-label-text">Institutional Email *</label>
+      <input type="email" id="gate-email" placeholder="e.g. name@iskolarngbayan.pup.edu.ph" style="width: 100%;" />
+    </div>
+
+    <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="window.handleGateLogin()" id="auth-submit-btn">Send Login Magic Link</button>
+    <a href="admin.html" style="display:block;margin-top:16px;font-size:12px;color:var(--maroon);text-decoration:none;">Administrator sign in</a>
+  </div>
+</div>
+
+<div class="shell" id="app-shell" style="display: none;">
+  <!-- SIDEBAR (Desktop) -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-seal"> PUP </div>
+      <div class="brand-name">PUP Akademia</div>
+      <div class="brand-sub">Lost &amp; Found System</div>
+    </div>
+    <!-- HOME. -->
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Menu</div>
+      <button class="nav-item active" data-sec="home">
+        <span class="nav-icon">🏠</span> Home
+      </button>
+      <button class="nav-item" data-sec="items">
+        <span class="nav-icon">📋</span> Browse Items
+        <span class="nav-badge" id="sb-badge">0</span>
+      </button>
+    
+    <!-- PERSONAL / USER ACTION -->
+      <div class="nav-section-label" style="margin-top: 16px;">Personal</div>
+      <button class="nav-item" data-sec="my-reports">
+        <span class="nav-icon">👤</span> My Reports
+      </button>
+
+      <div class="nav-section-label">Actions</div>
+      <button class="nav-item" onclick="openReport()">
+        <span class="nav-icon">➕</span> Report Item
+      </button>
+      <button class="nav-item" type="button" onclick="window.openFeedbackSheet()">
+        <span class="nav-icon">💬</span> Report Feedback
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="fb-badge">
+        <div class="fb-dot" id="fb-dot"></div>
+        <span id="fb-lbl">Supabase ready</span>
+      </div>
+      <button class="logout-btn" type="button" id="logout-btn">Log out</button>
+    </div>
+  </aside>
+
+  <!-- MOBILE TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-seal">PUP</div>
+      <div class="topbar-name">PUP Akademia</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openReport()">+ Report</button>
+  </header>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="main">
+    
+    <!-- SECTION: HOME -->
+    <section id="sec-home" class="section active">
+      <div class="page-header">
+        <h1>Campus Lost &amp; Found</h1>
+        <p>A centralized platform for the Polytechnic University of the Philippines community to report and recover misplaced belongings.</p>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openReport()">Report Lost or Found Item</button>
+          <button class="btn btn-ghost-on-maroon" onclick="goTo('items')">Browse All Items</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div id="announcement-banner" class="announcement-strip" role="status" aria-live="polite">
+          <div class="announcement-tag">Announcement</div>
+          <div class="announcement-copy">
+            <strong>Lost and Found Week:</strong> Claim your items at the Student Center from 9:00 AM to 4:00 PM this Friday.
+          </div>
+        </div>
+
+        <div class="home-grid">
+          <div class="home-tile" onclick="goTo('items')">
+            <div class="tile-icon red">🔴</div>
+            <h3>Lost Reports</h3>
+            <p>View items reported missing across campus grounds.</p>
+            <div class="tile-stat" id="hs-lost"><span data-stat-count>0</span><span>active items</span></div>
+          </div>
+          <div class="home-tile" onclick="goTo('items')">
+            <div class="tile-icon green">🟢</div>
+            <h3>Found Items</h3>
+            <p>Browse items turned in to offices or student councils.</p>
+            <div class="tile-stat" id="hs-found"><span data-stat-count>0</span><span>items waiting</span></div>
+          </div>
+          <div class="home-tile" onclick="goTo('items')">
+            <div class="tile-icon amber">⚠️</div>
+            <h3>Open Reports</h3>
+            <p>Total unresolved cases currently tracking.</p>
+            <div class="tile-stat" id="hs-open"><span data-stat-count>0</span><span>open cases</span></div>
+          </div>
+          <div class="home-tile" onclick="goTo('items')">
+            <div class="tile-icon purple">✨</div>
+            <h3>Resolved</h3>
+            <p>Successfully reunited items and owners.</p>
+            <div class="tile-stat" id="hs-res"><span data-stat-count>0</span><span>resolved</span></div>
+          </div>
+        </div>
+
+        <div class="home-two-col" style="margin-top:10px">
+          <div>
+            <div class="section-label">Quick Overview</div>
+            <div class="home-tile quick-overview">
+              <div class="overview-counts">
+                <div class="overview-metric"><strong id="ht-open">0</strong><span>open reports</span></div>
+                <div class="overview-metric"><strong id="ht-resolved">0</strong><span>resolved</span></div>
+              </div>
+              <p>Search current reports by category, location, or status.</p>
+              <button class="btn btn-ghost btn-sm" type="button" onclick="goTo('items')">Browse items <span aria-hidden="true">→</span></button>
+            </div>
+          </div>
+          <div>
+            <div class="section-label">Recent Activity</div>
+            <div class="recent-list" id="recent-list">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: BROWSE ITEMS -->
+    <section id="sec-items" class="section">
+      <div class="page-header">
+        <h1>Browse Items</h1>
+        <p>Filter through all reported lost and found belongings on campus.</p>
+        <div class="stat-strip">
+          <div class="stat-pill"><span class="stat-pill-icon">📦</span><div><div class="stat-pill-val" id="lf-total">0</div><div class="stat-pill-lbl">Total</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon">🔴</span><div><div class="stat-pill-val" id="lf-lost">0</div><div class="stat-pill-lbl">Lost</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon">🟢</span><div><div class="stat-pill-val" id="lf-found">0</div><div class="stat-pill-lbl">Found</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon">✨</span><div><div class="stat-pill-val" id="lf-resolved">0</div><div class="stat-pill-lbl">Resolved</div></div></div>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="lf-search" placeholder="Search item title, location, description..."/>
+          </div>
+          <select id="status-filter" class="select-sm">
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="claimed">Claimed</option>
+            <option value="resolved">Resolved</option>
+          </select>
+          <select id="cat-filter" class="select-sm">
+            <option value="">All Categories</option>
+            <option value="Electronics">Electronics</option>
+            <option value="Clothing & Accessories">Clothing & Accessories</option>
+            <option value="ID / Cards">ID / Cards</option>
+            <option value="Bag / Backpack">Bag / Backpack</option>
+            <option value="Books / Notes">Books / Notes</option>
+            <option value="Keys">Keys</option>
+            <option value="Glasses">Glasses</option>
+            <option value="Jewelry">Jewelry</option>
+            <option value="Money / Wallet">Money / Wallet</option>
+            <option value="Documents">Documents</option>
+            <option value="Other">Other</option>
+          </select>
+          <div class="chip-group" id="type-chips">
+            <div class="chip active" data-type="">All Types</div>
+            <div class="chip" data-type="lost">Lost</div>
+            <div class="chip" data-type="found">Found</div>
+          </div>
+        </div>
+
+        <div class="cards-grid" id="items-grid">
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Loading items feed...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: MY REPORTS -->
+    <section id="sec-my-reports" class="section">
+      <div class="page-header">
+        <h1>My Reports</h1>
+        <p>Track the reports you submitted and update their status.</p>
+      </div>
+      <div class="page-body">
+        <div class="cards-grid" id="my-reports-grid">
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Loading your reports...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- MOBILE BOTTOM NAVIGATION -->
+<nav class="mobile-nav">
+  <button class="mob-btn active" data-sec="home"><span class="mn-icon">🏠</span>Home</button>
+  <button class="mob-btn" data-sec="items"><span class="mn-icon">📋</span>Browse</button>
+  <button class="mob-btn" onclick="openReport()"><span class="mn-icon">➕</span>Report</button>
+  <button class="mob-btn" data-sec="my-reports"><span class="mn-icon">👤</span>My Reports</button>
+  <button class="mob-btn" type="button" onclick="window.openFeedbackSheet()"><span class="mn-icon">💬</span>Feedback</button>
+</nav>
+
+<!-- REPORT MODAL OVERLAY -->
+<div class="overlay" id="report-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Report Lost or Found Item</h2>
+      <button class="modal-close" onclick="closeModal('report-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:16px">
+        <label>Report Type</label>
+        <div class="type-toggle">
+          <button type="button" class="type-opt sel-lost" id="t-lost" onclick="setFType('lost')">🔴 I Lost Something</button>
+          <button type="button" class="type-opt" id="t-found" onclick="setFType('found')">🟢 I Found Something</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>Item Title <span class="req">*</span></label>
+          <input type="text" id="f-title" placeholder="e.g. Student ID - CCS or Black Umbrella"/>
+        </div>
+        <div class="field">
+          <label>Category <span class="req">*</span></label>
+          <select id="f-cat">
+            <option value="Electronics">Electronics</option>
+            <option value="Clothing & Accessories">Clothing & Accessories</option>
+            <option value="ID / Cards">ID / Cards</option>
+            <option value="Bag / Backpack">Bag / Backpack</option>
+            <option value="Books / Notes">Books / Notes</option>
+            <option value="Keys">Keys</option>
+            <option value="Glasses">Glasses</option>
+            <option value="Jewelry">Jewelry</option>
+            <option value="Money / Wallet">Money / Wallet</option>
+            <option value="Documents">Documents</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-campus">PUP Campus <span class="req">*</span></label>
+          <select id="f-campus" required>
+            <option value="">Select campus</option>
+            <optgroup label="Metro Manila">
+              <option value="A. Mabini Main Campus (Sta. Mesa, Manila)">A. Mabini Main Campus (Sta. Mesa, Manila)</option>
+              <option value="NDC Compound (Sta. Mesa, Manila)">NDC Compound (Sta. Mesa, Manila)</option>
+              <option value="M.H. Del Pilar Campus (Sta. Mesa, Manila)">M.H. Del Pilar Campus (Sta. Mesa, Manila)</option>
+              <option value="S.H. Loyola Campus (Manila)">S.H. Loyola Campus (Manila)</option>
+              <option value="Taguig City Campus">Taguig City Campus</option>
+              <option value="Quezon City Campus">Quezon City Campus</option>
+              <option value="San Juan City Campus">San Juan City Campus</option>
+              <option value="Paranaque City Campus">Paranaque City Campus</option>
+              <option value="Caloocan City Campus">Caloocan City Campus</option>
+            </optgroup>
+            <optgroup label="Central Luzon">
+              <option value="Bataan Campus">Bataan Campus</option>
+              <option value="Sta. Maria, Bulacan Campus">Sta. Maria, Bulacan Campus</option>
+              <option value="Pulilan, Bulacan Campus">Pulilan, Bulacan Campus</option>
+              <option value="Cabiao, Nueva Ecija Campus">Cabiao, Nueva Ecija Campus</option>
+            </optgroup>
+            <optgroup label="South Luzon">
+              <option value="Lopez, Quezon Campus">Lopez, Quezon Campus</option>
+              <option value="Mulanay, Quezon Campus">Mulanay, Quezon Campus</option>
+              <option value="General Luna, Quezon Campus">General Luna, Quezon Campus</option>
+              <option value="Unisan, Quezon Campus">Unisan, Quezon Campus</option>
+              <option value="Ragay, Camarines Sur Campus">Ragay, Camarines Sur Campus</option>
+              <option value="Sto. Tomas, Batangas Campus">Sto. Tomas, Batangas Campus</option>
+              <option value="Maragondon, Cavite Campus">Maragondon, Cavite Campus</option>
+              <option value="Alfonso, Cavite Campus">Alfonso, Cavite Campus</option>
+              <option value="Binan, Laguna Campus">Binan, Laguna Campus</option>
+              <option value="San Pedro, Laguna Campus">San Pedro, Laguna Campus</option>
+              <option value="Sta. Rosa, Laguna Campus">Sta. Rosa, Laguna Campus</option>
+              <option value="Calauan, Laguna Campus">Calauan, Laguna Campus</option>
+              <option value="Pakil, Laguna Campus">Pakil, Laguna Campus</option>
+            </optgroup>
+            <optgroup label="MIMAROPA">
+              <option value="Bansud, Oriental Mindoro Campus">Bansud, Oriental Mindoro Campus</option>
+              <option value="Sablayan, Occidental Mindoro Campus">Sablayan, Occidental Mindoro Campus</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-loc">Specific Location <span class="req">*</span></label>
+          <input type="text" id="f-loc" placeholder="e.g. Main Library, 3rd Floor" required />
+        </div>
+        <div class="field full">
+          <label>Description <span class="req">*</span></label>
+          <textarea id="f-desc" placeholder="Provide distinct features, color, brand, or stickers..."></textarea>
+        </div>
+        <div class="field">
+          <label>Your Name <span class="req">*</span></label>
+          <input type="text" id="f-name" placeholder="Full Name"/>
+        </div>
+        <div class="field">
+          <label>Contact Info (Email / Phone) <span class="req">*</span></label>
+          <input type="text" id="f-contact" placeholder="e.g. maria@pup.edu.ph"/>
+        </div>
+        <div class="field">
+          <label for="f-dept">Department / College (optional)</label>
+          <select id="f-dept">
+            <option value="">Select college or unit</option>
+            <option value="College of Accountancy and Finance (CAF)">College of Accountancy and Finance (CAF)</option>
+            <option value="College of Architecture, Design and the Built Environment (CADBE)">College of Architecture, Design and the Built Environment (CADBE)</option>
+            <option value="College of Arts and Letters (CAL)">College of Arts and Letters (CAL)</option>
+            <option value="College of Business Administration (CBA)">College of Business Administration (CBA)</option>
+            <option value="College of Communication (COC)">College of Communication (COC)</option>
+            <option value="College of Computer and Information Sciences (CCIS)">College of Computer and Information Sciences (CCIS)</option>
+            <option value="College of Education (COED)">College of Education (COED)</option>
+            <option value="College of Engineering (CE)">College of Engineering (CE)</option>
+            <option value="College of Human Kinetics (CHK)">College of Human Kinetics (CHK)</option>
+            <option value="College of Law (CL)">College of Law (CL)</option>
+            <option value="College of Political Science and Public Administration (CPSPA)">College of Political Science and Public Administration (CPSPA)</option>
+            <option value="College of Social Sciences and Development (CSSD)">College of Social Sciences and Development (CSSD)</option>
+            <option value="College of Science (CS)">College of Science (CS)</option>
+            <option value="College of Tourism, Hospitality and Transportation Management (CTHTM)">College of Tourism, Hospitality and Transportation Management (CTHTM)</option>
+            <option value="Institute of Technology (ITECH)">Institute of Technology (ITECH)</option>
+            <option value="Open University System (OUS)">Open University System (OUS)</option>
+            <option value="Senior High School (SHS)">Senior High School (SHS)</option>
+            <option value="Laboratory High School (LHS)">Laboratory High School (LHS)</option>
+            <option value="University Office / Personnel">University Office / Personnel</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Attach Image</label>
+          <input type="file" id="f-img-file" accept="image/*"/>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeModal('report-overlay')">Cancel</button>
+        <button class="btn btn-primary" id="submit-btn" onclick="submitReport()">Submit Report</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CLAIM ITEM MODAL OVERLAY -->
+<div id="claim-modal-overlay" class="modal-overlay" style="display: none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>Submit Item Claim</h2>
+      <button class="close-btn" onclick="window.closeModal('claim-modal-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="claim-form" onsubmit="window.submitClaim(event)">
+        <input type="hidden" id="claim-item-id" />
+        
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="c-name" class="form-control" placeholder="e.g., Juan Dela Cruz" required />
+        </div>
+
+        <div class="form-group">
+          <label>PUP Institutional Email or Mobile *</label>
+          <input type="text" id="c-contact" class="form-control" placeholder="e.g., 2023-12345-MN-0@iskolarngbayan.pup.edu.ph" required />
+        </div>
+
+        <div class="form-group">
+          <label>Proof of Ownership / Secret Details *</label>
+          <textarea id="c-proof" class="form-control" rows="3" placeholder="Describe a unique sticker, wallpaper, scratch, or exact content inside the item to prove it is yours." required></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="window.closeModal('claim-modal-overlay')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="claim-submit-btn">Submit Claim</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- OWNER MATCH ADMIN REVIEW MODAL -->
+<div class="overlay" id="owner-match-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Owner Match Review</h2>
+      <button class="modal-close" onclick="window.closeModal('owner-match-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form onsubmit="window.submitOwnerMatch(event)">
+        <input type="hidden" id="owner-match-item-id" />
+
+        <div class="field" style="margin-bottom:16px;">
+          <label>Likely owner name</label>
+          <input type="text" id="owner-match-name" placeholder="e.g. Maria Santos" required />
+        </div>
+
+        <div class="field" style="margin-bottom:16px;">
+          <label>How do you know it is theirs?</label>
+          <textarea id="owner-match-proof" rows="4" placeholder="Name on a case, student ID details, sticker, exact serial, or other identifying clue." required></textarea>
+        </div>
+
+        <div class="field" style="margin-bottom:16px;">
+          <label>Evidence photo</label>
+          <input type="file" id="owner-match-image" accept="image/*" />
+        </div>
+
+        <div class="field" style="margin-bottom:16px;">
+          <label>Your contact</label>
+          <input type="text" id="owner-match-contact" placeholder="e.g. founder@pup.edu.ph" required />
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="window.closeModal('owner-match-overlay')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Send to Admin</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- FEEDBACK SHEET -->
+<div class="overlay" id="feedback-overlay" style="display:none;">
+  <div class="modal feedback-modal">
+    <div class="modal-head">
+      <h2>Share Feedback</h2>
+      <button class="modal-close" type="button" onclick="window.closeModal('feedback-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="feedback-topic-step">
+        <p class="feedback-question">What would you like to report?</p>
+        <div class="feedback-topics">
+          <label class="feedback-topic">
+            <input type="radio" name="feedback-topic" value="website" />
+            <span><strong>Website problem or suggestion</strong><small>Tell us what is not working or how we could improve the site.</small></span>
+          </label>
+          <label class="feedback-topic">
+            <input type="radio" name="feedback-topic" value="item" />
+            <span><strong>I need help with an item claim</strong><small>The poster has not replied. Ask an admin to follow up.</small></span>
+          </label>
+          <label class="feedback-topic">
+            <input type="radio" name="feedback-topic" value="announcement" />
+            <span><strong>Problem with an announcement</strong><small>Report information that is incorrect or out of date.</small></span>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" type="button" onclick="window.closeModal('feedback-overlay')">Cancel</button>
+          <button class="btn btn-primary" type="button" onclick="window.continueFeedback()">Continue</button>
+        </div>
+      </div>
+      <form id="feedback-message-step" class="hidden" onsubmit="window.submitFeedback(event)">
+        <p class="feedback-question" id="feedback-message-prompt">Tell us more</p>
+        <div class="field hidden" id="feedback-item-field">
+          <label for="feedback-item-select">Which item are you trying to claim?</label>
+          <select id="feedback-item-select"></select>
+        </div>
+        <div class="field" style="margin-top:14px;">
+          <label for="feedback-message" id="feedback-message-label">Details</label>
+          <textarea id="feedback-message" rows="5" placeholder="Include details that will help us understand the issue." required></textarea>
+        </div>
+        <div class="field hidden" id="feedback-item-evidence-field">
+          <label for="feedback-item-evidence">Optional photo evidence</label>
+          <input id="feedback-item-evidence" name="evidence-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="feedback-evidence-hint" />
+          <small id="feedback-evidence-hint">One image, up to 5 MB. Only admins can view claim evidence.</small>
+        </div>
+        <div class="field hidden" id="feedback-report-evidence-field">
+          <label for="feedback-report-evidence">Optional screenshot</label>
+          <input id="feedback-report-evidence" name="feedback-evidence-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-describedby="feedback-report-evidence-hint" />
+          <small id="feedback-report-evidence-hint">One image, up to 5 MB. Only admins can view this screenshot.</small>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-ghost" type="button" onclick="window.backToFeedbackTopics()">Back</button>
+          <button class="btn btn-primary" id="feedback-submit-btn" type="submit">Send feedback</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL OVERLAY -->
+<div class="overlay" id="detail-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="det-title">Item Details</h2>
+      <button class="modal-close" onclick="closeModal('detail-overlay')">&times;</button>
+    </div>
+    <div class="modal-body" id="det-body">
+      <!-- Dynamically filled -->
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG / SETUP MODAL (For demo or live credentials) -->
+<div class="overlay" id="fb-dialog" style="display:flex">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <h2>Welcome to ISKOFINDS</h2>
+    </div>
+    <div class="modal-body">
+      <div class="config-banner" style="margin-bottom:16px">
+        <div>
+          <h4>Choose Mode</h4>
+          <p>You can instantly test the app in local demo mode, or connect your Supabase credentials.</p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button id="start-demo-mode" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" type="button" onclick="window.startDemo()">Start in demo mode</button>
+        <p>For a live deployment, configure the Supabase URL and public anon key in <code>js/supabase-config.js</code>, then reload this page.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST NOTIFICATION CONTAINER -->
+<div id="toast" class="toast"></div>
+
+<!-- JS - SUPABASE -->
+<script type="module" src="./js/supabase-config.js">
+        console.log("Supabase initialized successfully")
+</script>
+
+<!-- JS - order matters because of shared state -->
+<script type="module">
+    import './js/utils.js';
+    import './js/supabase-config.js';
+    import './js/items.js';
+    import './js/ui.js';
+    import './js/app.js';
+</script>
+
+</div>
+
+</body>
+</html>
