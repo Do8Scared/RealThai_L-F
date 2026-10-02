@@ -2,8 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Replace these with your real Supabase project values.
 // Use the project URL and the public anon key from Supabase Dashboard > Project Settings > API.
-const supabaseUrl = 'https://tqrskuyxqzinfjzntclb.supabase.co';
-const supabaseAnonKey = 'sb_publishable_YOH86gar47kwYYgux6T4xQ_-mFljq_E';
+const supabaseUrl = 'SUPABASE_URL';
+const supabaseAnonKey = 'SUPABASE_ANON_KEY';
 
 const hasPlaceholderValue = (value) => {
   if (!value) return true;
