@@ -19,20 +19,19 @@
  */
 
 import { supabase } from './supabase-config.js';
-import { subscribeToItems } from './items.js';
 import { renderAll } from './ui.js';
-import { toast, DEMO_ITEMS, formatPostId, x } from './utils.js';
+import { toast, formatPostId, x } from './utils.js';
 
 const state = {
   items: [],
   activeType: '',
   userEmail: '',
-    userId: '',
+  userId: '',
   adminQueue: [],
   activeAnnouncement: null,
   announcementReports: [],
-    feedbackReports: [],
-    claimFollowupRequests: [],
+  feedbackReports: [],
+  claimFollowupRequests: [],
 };
 
 function addActivity(itemId, activity) {
@@ -58,8 +57,6 @@ function addAnnouncementReport(report) {
     timestamp: Date.now(),
   });
 }
-
-const AUTH_SESSION_KEY = 'iskofinds.demo-session';
 
 function isAllowedInstitutionalEmail(email) {
     return /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@iskolarngbayan\.pup\.edu\.ph$/i.test(email);
@@ -107,13 +104,7 @@ window.setFType = (type) => {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    const setupDialog = document.getElementById('fb-dialog');
-    if (supabase || localStorage.getItem(AUTH_SESSION_KEY)) {
-        setupDialog.style.display = 'none';
-    } else {
-        setupDialog.style.display = 'flex';
-    }
-  checkAuthGate();
+    checkAuthGate();
     document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
     window.switchAuthTab('login');
 
@@ -131,24 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-  initAppNavigation();
-  bindReportButtons();
-  initFilterListeners();
-  fetchAndSyncItems();
+    initAppNavigation();
+    bindReportButtons();
+    initFilterListeners();
 });
-
-window.startDemo = () => {
-    if (supabase) return;
-    const demoEmail = 'demo@iskolarngbayan.pup.edu.ph';
-    localStorage.setItem(AUTH_SESSION_KEY, demoEmail);
-    state.userEmail = demoEmail;
-    state.userId = 'demo-user';
-    state.items = DEMO_ITEMS;
-    document.getElementById('fb-dialog').style.display = 'none';
-    unlockAppShell(demoEmail);
-    renderAll(state);
-    toast('Demo mode is active. This session is not verified.', 'success');
-};
 
 function bindReportButtons() {
   const reportButtons = document.querySelectorAll('[onclick*="openReport()"], [data-open="report"], .nav-item[onclick*="openReport"], .mob-btn[onclick*="openReport"], .btn[onclick*="openReport"]');
@@ -230,27 +207,27 @@ function initFilterListeners() {
 
 async function fetchAndSyncItems(){
     if (!supabase) {
-      state.items = DEMO_ITEMS;
+      state.items = [];
       renderAll(state);
       return;
     }
 
     try {
       const {data, error} = await supabase.from('items')
-      .select('*')
-      .order('created_at', {ascending: false});
+        .select('*')
+        .order('created_at', {ascending: false});
 
       if (error) {
         console.error('Error fetching items:', error);
         toast('Error fetching items. Please try again later.', 'error');
-                state.items = [];
+        state.items = [];
       } else {
-                state.items = data || [];
+        state.items = data || [];
       }
     } catch (error) {
       console.error('Unexpected item fetch error:', error);
       toast('Unable to load items right now.', 'error');
-            state.items = [];
+      state.items = [];
     }
     renderAll(state);
 }
@@ -280,16 +257,17 @@ window.submitReport = async () => {
         return;
     }
 
-    let authenticatedUser = null;
-    if (supabase) {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user || !isAllowedInstitutionalEmail(user.email || '')) {
-            toast('Sign in with your PUP account before submitting a report.', 'error');
-            return;
-        }
-        authenticatedUser = user;
-        state.userId = user.id;
+    if (!supabase) {
+        toast('Backend is not configured.', 'error');
+        return;
     }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user || !isAllowedInstitutionalEmail(user.email || '')) {
+        toast('Sign in with your PUP account before submitting a report.', 'error');
+        return;
+    }
+    state.userId = user.id;
 
     const originalBtnText = submitBtn ? submitBtn.textContent : 'Submit Report';
     if (submitBtn) {
@@ -312,110 +290,64 @@ window.submitReport = async () => {
                 return;
             }
 
-            if (supabase) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-                const { error: uploadError } = await supabase.storage
-                    .from('item-images')
-                    .upload(fileName, file);
+            const { error: uploadError } = await supabase.storage
+                .from('item-images')
+                .upload(fileName, file);
 
-                if (uploadError) {
-                    console.error('Image upload error:', uploadError);
-                    toast('Failed to upload image.', 'error');
-                    return;
-                }
-
-                const { data: publicUrlData } = supabase.storage
-                    .from('item-images')
-                    .getPublicUrl(fileName);
-
-                imageUrl = publicUrlData?.publicUrl || '';
-            } else {
-                imageUrl = URL.createObjectURL(file);
-            }
-        }
-
-        const nextDemoPostNumber = Math.max(0, ...state.items.map(item => Number(item.post_number) || 0)) + 1;
-        const newReport = {
-            id: 'd' + Date.now(),
-            user_id: state.userId || 'demo-user',
-            post_number: nextDemoPostNumber,
-            title,
-            description,
-            category,
-            campus,
-            type: currentReportType,
-            location,
-            reporterName,
-            contact,
-            department,
-            imageUrl,
-            status: 'open',
-            created_at: new Date().toISOString(),
-            createdAt: { seconds: Math.floor(Date.now() / 1000) },
-            activity: [{
-                id: 'evt_initial',
-                actor: reporterName,
-                type: 'report_created',
-                message: `${reporterName} submitted this ${currentReportType} report.`,
-                timestamp: Date.now(),
-                imageUrl: imageUrl || '',
-            }],
-        };
-
-        if (supabase) {
-            const itemActivity = [{
-                id: 'evt_initial',
-                actor: reporterName,
-                type: 'report_created',
-                message: `${reporterName} submitted this ${currentReportType} report.`,
-                timestamp: Date.now(),
-                imageUrl: imageUrl || '',
-            }];
-
-            const { data, error } = await supabase
-                .from('items')
-                .insert([{
-                    user_id: authenticatedUser.id,
-                    title,
-                    description,
-                    category,
-                    campus,
-                    type: currentReportType,
-                    location,
-                    reporterName,
-                    contact,
-                    department,
-                    imageUrl,
-                    status: 'open',
-                    created_at: new Date().toISOString(),
-                    activity: [{
-                        id: 'evt_initial',
-                        actor: reporterName,
-                        type: 'report_created',
-                        message: `${reporterName} submitted this ${currentReportType} report.`,
-                        timestamp: Date.now(),
-                        imageUrl: imageUrl || '',
-                    }],
-                }])
-                .select();
-
-            if (error) {
-                console.error('Error inserting item:', error);
-                toast('Failed to save report to database.', 'error');
+            if (uploadError) {
+                console.error('Image upload error:', uploadError);
+                toast('Failed to upload image.', 'error');
                 return;
             }
 
-            if (data && data[0]) {
-                state.items.unshift(data[0]);
-            }
-        } else {
-            state.items.unshift(newReport);
-            toast('Demo mode: report saved locally.', 'success');
+            const { data: publicUrlData } = supabase.storage
+                .from('item-images')
+                .getPublicUrl(fileName);
+
+            imageUrl = publicUrlData?.publicUrl || '';
         }
 
-        toast(supabase ? 'Item reported successfully!' : 'Demo report saved successfully!', 'success');
+        const { data, error } = await supabase
+            .from('items')
+            .insert([{
+                user_id: user.id,
+                title,
+                description,
+                category,
+                campus,
+                type: currentReportType,
+                location,
+                reporterName,
+                contact,
+                department,
+                imageUrl,
+                status: 'open',
+                created_at: new Date().toISOString(),
+                activity: [{
+                    id: 'evt_initial',
+                    actor: reporterName,
+                    type: 'report_created',
+                    message: `${reporterName} submitted this ${currentReportType} report.`,
+                    timestamp: Date.now(),
+                    imageUrl: imageUrl || '',
+                }],
+            }])
+            .select();
+
+        if (error) {
+            console.error('Error inserting item:', error);
+            toast('Failed to save report to database.', 'error');
+            return;
+        }
+
+        if (data && data[0]) {
+            state.items.unshift(data[0]);
+        }
+
+        toast('Item reported successfully!', 'success');
         window.closeModal('report-overlay');
 
         document.getElementById('f-title').value = '';
@@ -449,9 +381,9 @@ function renderMyReports(state) {
     const grid = document.getElementById('my-reports-grid');
     if (!grid) return;
 
-    const myItems = supabase
+    const myItems = state.userId
         ? state.items.filter(item => item.user_id === state.userId)
-        : state.items;
+        : [];
 
     if (myItems.length === 0) {
         grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No reports found.</p>`;
@@ -460,20 +392,20 @@ function renderMyReports(state) {
 
     grid.innerHTML = myItems.map(item => `
         <div class="item-card" style="border-left: 4px solid ${item.status === 'open' ? 'var(--maroon)' : 'var(--success)'};">
-            ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.title}" style="width:100%; height:160px; object-fit:cover; border-radius:4px 4px 0 0;">` : ''}
+            ${item.imageUrl ? `<img src="${x(item.imageUrl)}" alt="${x(item.title)}" style="width:100%; height:160px; object-fit:cover; border-radius:4px 4px 0 0;">` : ''}
             <div style="padding: 12px;">
-                <span class="badge ${item.type}">${item.type ? item.type.toUpperCase() : 'LOST'}</span>
-                <h3 style="margin: 8px 0 4px 0; font-size: 16px;">${item.title}</h3>
+                <span class="badge ${x(item.type)}">${item.type ? x(item.type.toUpperCase()) : 'LOST'}</span>
+                <h3 style="margin: 8px 0 4px 0; font-size: 16px;">${x(item.title)}</h3>
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Post ID: ${formatPostId(item.post_number)}</p>
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">${x(item.campus || 'Campus not specified')}</p>
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">📍 ${x(item.location)}</p>
-                <p style="font-size: 13px; margin-bottom: 12px;">Status: <strong>${item.status}</strong></p>
+                <p style="font-size: 13px; margin-bottom: 12px;">Status: <strong>${x(item.status)}</strong></p>
                 
                 <div style="display: flex; gap: 8px;">
                     ${item.status === 'open' ? `
-                        <button class="btn btn-sm btn-primary" onclick="window.updateItemStatus('${item.id}', 'resolved')">Mark Resolved</button>
+                        <button class="btn btn-sm btn-primary" onclick="window.updateItemStatus('${x(item.id)}', 'resolved')">Mark Resolved</button>
                     ` : `
-                        <button class="btn btn-sm btn-ghost" onclick="window.updateItemStatus('${item.id}', 'open')">Reopen</button>
+                        <button class="btn btn-sm btn-ghost" onclick="window.updateItemStatus('${x(item.id)}', 'open')">Reopen</button>
                     `}
                 </div>
             </div>
@@ -659,18 +591,8 @@ window.submitFeedback = async (event) => {
                 return;
             }
         } else {
-            state.claimFollowupRequests.unshift({
-                ...feedback,
-                type: 'claim_followup',
-                itemId: item.id,
-                itemTitle: item.title,
-                postNumber: item.post_number,
-                campus: item.campus || '',
-                posterName: item.reporterName || 'Unknown',
-                posterContact: item.contact || '',
-                evidence_image: evidenceFile ? URL.createObjectURL(evidenceFile) : null,
-                status: 'pending',
-            });
+            toast('Backend is not configured.', 'error');
+            return;
         }
     } else {
         const evidenceInput = document.getElementById('feedback-report-evidence');
@@ -709,17 +631,8 @@ window.submitFeedback = async (event) => {
                 return;
             }
         } else {
-            const localReport = {
-                ...feedback,
-                email: state.userEmail,
-                evidence_image: evidenceFile ? URL.createObjectURL(evidenceFile) : null,
-                status: 'pending',
-            };
-            if (selectedFeedbackTopic === 'announcement') {
-                addAnnouncementReport({ ...localReport, type: 'announcement_report' });
-            } else {
-                state.feedbackReports.unshift(localReport);
-            }
+            toast('Backend is not configured.', 'error');
+            return;
         }
     }
 
@@ -732,19 +645,8 @@ window.submitFeedback = async (event) => {
 };
 
 window.updateItemStatus = async (itemId, newStatus) => {
-    const item = state.items.find(i => i.id === itemId);
     if (!supabase) {
-        toast('Demo mode: status update simulated locally.', 'success');
-        if (item) {
-            item.status = newStatus;
-            addActivity(itemId, {
-                actor: 'Admin',
-                type: 'status_changed',
-                message: `Status changed to ${newStatus}.`,
-            });
-        }
-        renderAll(state);
-        renderMyReports(state);
+        toast('Backend is not configured.', 'error');
         return;
     }
 
@@ -789,45 +691,45 @@ window.openDetail = (itemId, cardImageUrl = '') => {
     const imageUrl = cardImageUrl || item.imageUrl || '';
     title.textContent = item.title;
     body.innerHTML = `
-            ${imageUrl ? `<img class="detail-photo" src="${x(imageUrl)}" alt="Photo of ${x(item.title)}" />` : ''}
+      ${imageUrl ? `<img class="detail-photo" src="${x(imageUrl)}" alt="Photo of ${x(item.title)}" />` : ''}
       <div class="detail-grid">
-                <div class="detail-field">
-                    <div class="detail-label">Post ID</div>
-                    <div class="detail-val">${formatPostId(item.post_number)}</div>
-                </div>
+        <div class="detail-field">
+          <div class="detail-label">Post ID</div>
+          <div class="detail-val">${formatPostId(item.post_number)}</div>
+        </div>
         <div class="detail-field">
           <div class="detail-label">Type</div>
           <div class="detail-val">${item.type === 'lost' ? 'Lost' : 'Found'}</div>
         </div>
         <div class="detail-field">
           <div class="detail-label">Status</div>
-          <div class="detail-val">${item.status}</div>
+          <div class="detail-val">${x(item.status)}</div>
         </div>
         <div class="detail-field">
           <div class="detail-label">Category</div>
-          <div class="detail-val">${item.category || 'Other'}</div>
+          <div class="detail-val">${x(item.category || 'Other')}</div>
         </div>
-                <div class="detail-field">
-                    <div class="detail-label">Campus</div>
-                    <div class="detail-val">${x(item.campus || 'Not specified')}</div>
-                </div>
+        <div class="detail-field">
+          <div class="detail-label">Campus</div>
+          <div class="detail-val">${x(item.campus || 'Not specified')}</div>
+        </div>
         <div class="detail-field">
           <div class="detail-label">Location</div>
-          <div class="detail-val">${item.location || 'Not specified'}</div>
+          <div class="detail-val">${x(item.location || 'Not specified')}</div>
         </div>
       </div>
 
       <div class="detail-label">Description</div>
-      <div class="detail-val" style="margin-bottom:16px;">${item.description || 'No description provided.'}</div>
+      <div class="detail-val" style="margin-bottom:16px;">${x(item.description || 'No description provided.')}</div>
 
       <div class="detail-grid">
         <div class="detail-field">
           <div class="detail-label">Reporter</div>
-          <div class="detail-val">${item.reporterName || 'Unknown'}</div>
+          <div class="detail-val">${x(item.reporterName || 'Unknown')}</div>
         </div>
         <div class="detail-field">
           <div class="detail-label">Contact</div>
-          <div class="detail-val">${item.contact || 'Not shared'}</div>
+          <div class="detail-val">${x(item.contact || 'Not shared')}</div>
         </div>
       </div>
 
@@ -845,10 +747,10 @@ window.openDetail = (itemId, cardImageUrl = '') => {
           ${(item.activity || []).slice(0, 6).map(entry => `
             <div style="background:var(--surface); border:1px solid var(--border-lt); border-radius:10px; padding:10px 12px; font-size:12.5px; color:var(--ink-2);">
               <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:4px;">
-                <strong>${entry.actor}</strong>
+                <strong>${x(entry.actor)}</strong>
                 <span style="color:var(--ink-3);">${new Date(entry.timestamp).toLocaleDateString('en-PH')}</span>
               </div>
-              <div>${entry.message}</div>
+              <div>${x(entry.message)}</div>
             </div>
           `).join('') || '<div style="font-size:12.5px; color:var(--ink-3);">No activity yet.</div>'}
         </div>
@@ -856,20 +758,10 @@ window.openDetail = (itemId, cardImageUrl = '') => {
 
       <div class="form-actions">
         <button class="btn btn-ghost" onclick="window.closeModal('detail-overlay')">Close</button>
-        <button class="btn btn-primary" onclick="window.openOwnerMatchModal('${item.id}')">I know the owner</button>
+        <button class="btn btn-primary" onclick="window.openOwnerMatchModal('${x(item.id)}')">I know the owner</button>
       </div>
     `;
 
-    modal.style.display = 'flex';
-    requestAnimationFrame(() => modal.classList.add('open'));
-};
-
-window.openClaimModal = (itemId) => {
-    const modal = document.getElementById('claim-modal-overlay');
-    const hiddenIdInput = document.getElementById('claim-item-id');
-    if (!modal || !hiddenIdInput) return;
-
-    hiddenIdInput.value = itemId;
     modal.style.display = 'flex';
     requestAnimationFrame(() => modal.classList.add('open'));
 };
@@ -900,14 +792,15 @@ window.submitOwnerMatch = async (e) => {
         return;
     }
 
-    let user = null;
-    if (supabase) {
-        const { data: { user: authenticatedUser }, error: userError } = await supabase.auth.getUser();
-        if (userError || !authenticatedUser) {
-            toast('Sign in again before sending an owner match.', 'error');
-            return;
-        }
-        user = authenticatedUser;
+    if (!supabase) {
+        toast('Backend is not configured.', 'error');
+        return;
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+        toast('Sign in again before sending an owner match.', 'error');
+        return;
     }
 
     let evidenceImage = '';
@@ -924,57 +817,37 @@ window.submitOwnerMatch = async (e) => {
             return;
         }
 
-        if (supabase) {
-            const fileExt = file.type.split('/')[1].replace('jpeg', 'jpg');
-            const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage.from('claim-evidence').upload(fileName, file, {
-                contentType: file.type,
-                upsert: false,
-            });
-            if (uploadError) {
-                console.error('Evidence upload failed:', uploadError);
-                toast('Failed to upload evidence image.', 'error');
-                return;
-            }
-            evidenceImage = fileName;
-        } else {
-            evidenceImage = URL.createObjectURL(file);
-        }
-    }
-
-    const request = {
-        id: 'match-' + Date.now(),
-        itemId,
-        itemTitle: item?.title || 'Item',
-        postNumber: item?.post_number,
-        campus: item?.campus || '',
-        likelyOwner,
-        proof,
-        contact,
-        evidenceImage,
-        createdAt: Date.now()
-    };
-
-    if (supabase) {
-        const { error } = await supabase.from('owner_match_requests').insert({
-            user_id: user.id,
-            item_id: String(itemId),
-            post_number: Number(item?.post_number) || null,
-            item_title: item?.title || 'Item',
-            campus: item?.campus || null,
-            likely_owner: likelyOwner,
-            proof,
-            contact,
-            evidence_image: evidenceImage || null,
+        const fileExt = file.type.split('/')[1].replace('jpeg', 'jpg');
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('claim-evidence').upload(fileName, file, {
+            contentType: file.type,
+            upsert: false,
         });
-        if (error) {
-            if (evidenceImage) await supabase.storage.from('claim-evidence').remove([evidenceImage]);
-            console.error('Owner match submission failed:', error);
-            toast('Could not send the owner match to admin review.', 'error');
+        if (uploadError) {
+            console.error('Evidence upload failed:', uploadError);
+            toast('Failed to upload evidence image.', 'error');
             return;
         }
-    } else {
-        state.adminQueue.unshift(request);
+        evidenceImage = fileName;
+    }
+
+    const { error } = await supabase.from('owner_match_requests').insert({
+        user_id: user.id,
+        item_id: String(itemId),
+        post_number: Number(item?.post_number) || null,
+        item_title: item?.title || 'Item',
+        campus: item?.campus || null,
+        likely_owner: likelyOwner,
+        proof,
+        contact,
+        evidence_image: evidenceImage || null,
+    });
+
+    if (error) {
+        if (evidenceImage) await supabase.storage.from('claim-evidence').remove([evidenceImage]);
+        console.error('Owner match submission failed:', error);
+        toast('Could not send the owner match to admin review.', 'error');
+        return;
     }
 
     toast('Sent to admin review. No announcement will be published before verification.', 'success');
@@ -986,40 +859,7 @@ window.submitOwnerMatch = async (e) => {
     renderAll(state);
 };
 
-window.submitClaim = async (e) => {
-    e.preventDefault();
-
-    const itemId = document.getElementById('claim-item-id')?.value;
-    const claimantName = document.getElementById('c-name')?.value.trim();
-    const contact = document.getElementById('c-contact')?.value.trim();
-    const proofDescription = document.getElementById('c-proof')?.value.trim();
-
-    if (!claimantName || !contact || !proofDescription) {
-        toast('Please fill out all required fields.', 'error');
-        return;
-    }
-
-    if (!isAllowedInstitutionalEmail(contact)) {
-        toast('Only @iskolarngbayan.pup.edu.ph email addresses are accepted.', 'error');
-        return;
-    }
-
-    if (itemId) {
-        addActivity(itemId, {
-            actor: claimantName,
-            type: 'claim_submitted',
-            message: `Claim submitted by ${claimantName}. Proof: ${proofDescription}`,
-        });
-    }
-
-    toast('Claim submitted successfully! The founder will review your proof.', 'success');
-    window.closeModal('claim-modal-overlay');
-
-    document.getElementById('c-name').value = '';
-    document.getElementById('c-contact').value = '';
-    document.getElementById('c-proof').value = '';
-  }
-  // ==========================================
+// ==========================================
 // AUTH GATE & SESSION ROUTING
 // ==========================================
 
@@ -1052,13 +892,7 @@ window.switchAuthTab = (mode) => {
 
 async function checkAuthGate() {
     if (!supabase) {
-        const savedEmail = localStorage.getItem(AUTH_SESSION_KEY) || '';
-        if (isAllowedInstitutionalEmail(savedEmail)) {
-            unlockAppShell(savedEmail);
-        } else {
-            localStorage.removeItem(AUTH_SESSION_KEY);
-            lockAppShell();
-        }
+        lockAppShell();
         return;
     }
 
@@ -1068,6 +902,7 @@ async function checkAuthGate() {
         if (!error && isAllowedInstitutionalEmail(email)) {
             state.userId = session.user.id;
             unlockAppShell(email);
+            void fetchAndSyncItems();
         } else {
             state.userId = '';
             lockAppShell();
@@ -1104,18 +939,16 @@ window.handleGateLogin = async () => {
     }
 
     if (!supabase) {
-        localStorage.setItem(AUTH_SESSION_KEY, email);
-        unlockAppShell(email);
-        state.userId = 'demo-user';
-        toast('Demo mode: Access granted. This session is not verified.', 'success');
+        toast('Backend is not configured.', 'error');
         return;
     }
 
     try {
+        const redirectUrl = window.location.origin + window.location.pathname;
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
-                emailRedirectTo: window.location.origin,
+                emailRedirectTo: redirectUrl,
                 shouldCreateUser: authMode === 'signup'
             }
         });
@@ -1140,8 +973,6 @@ async function handleLogout() {
             toast('Could not sign out. Please try again.', 'error');
             return;
         }
-    } else {
-        localStorage.removeItem(AUTH_SESSION_KEY);
     }
 
     lockAppShell();

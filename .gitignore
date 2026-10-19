@@ -4,5 +4,21 @@ js/env.js
 .env.local
 .env.*.local
 
+# Local credentials and private keys
+credentials.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
+*.secrets
+secrets/
+
+# Local tooling state
+.supabase/
+.vercel/
+.netlify/
+
 .DS_Store
 Thumbs.db

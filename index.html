@@ -4,6 +4,10 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <title>PUP Akademia — Lost &amp; Found</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>"/>
 <link rel="stylesheet" href="css/styles.css"/>
 </head>
 <body>
@@ -330,7 +334,7 @@
         </div>
         <div class="field">
           <label>Contact Info (Email / Phone) <span class="req">*</span></label>
-          <input type="text" id="f-contact" placeholder="e.g. maria@pup.edu.ph"/>
+          <input type="text" id="f-contact" placeholder="e.g. name@iskolarngbayan.pup.edu.ph"/>
         </div>
         <div class="field">
           <label for="f-dept">Department / College (optional)</label>
@@ -371,41 +375,6 @@
   </div>
 </div>
 
-<!-- CLAIM ITEM MODAL OVERLAY -->
-<div id="claim-modal-overlay" class="modal-overlay" style="display: none;">
-  <div class="modal-card">
-    <div class="modal-header">
-      <h2>Submit Item Claim</h2>
-      <button class="close-btn" onclick="window.closeModal('claim-modal-overlay')">&times;</button>
-    </div>
-    <div class="modal-body">
-      <form id="claim-form" onsubmit="window.submitClaim(event)">
-        <input type="hidden" id="claim-item-id" />
-        
-        <div class="form-group">
-          <label>Full Name *</label>
-          <input type="text" id="c-name" class="form-control" placeholder="e.g., Juan Dela Cruz" required />
-        </div>
-
-        <div class="form-group">
-          <label>PUP Institutional Email or Mobile *</label>
-          <input type="text" id="c-contact" class="form-control" placeholder="e.g., 2023-12345-MN-0@iskolarngbayan.pup.edu.ph" required />
-        </div>
-
-        <div class="form-group">
-          <label>Proof of Ownership / Secret Details *</label>
-          <textarea id="c-proof" class="form-control" rows="3" placeholder="Describe a unique sticker, wallpaper, scratch, or exact content inside the item to prove it is yours." required></textarea>
-        </div>
-
-        <div class="form-actions">
-          <button type="button" class="btn btn-ghost" onclick="window.closeModal('claim-modal-overlay')">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="claim-submit-btn">Submit Claim</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <!-- OWNER MATCH ADMIN REVIEW MODAL -->
 <div class="overlay" id="owner-match-overlay" style="display:none;">
   <div class="modal">
@@ -434,7 +403,7 @@
 
         <div class="field" style="margin-bottom:16px;">
           <label>Your contact</label>
-          <input type="text" id="owner-match-contact" placeholder="e.g. founder@pup.edu.ph" required />
+          <input type="text" id="owner-match-contact" placeholder="e.g. name@iskolarngbayan.pup.edu.ph" required />
         </div>
 
         <div class="form-actions">
@@ -517,45 +486,10 @@
   </div>
 </div>
 
-<!-- CONFIG / SETUP MODAL (For demo or live credentials) -->
-<div class="overlay" id="fb-dialog" style="display:flex">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-head">
-      <h2>Welcome to ISKOFINDS</h2>
-    </div>
-    <div class="modal-body">
-      <div class="config-banner" style="margin-bottom:16px">
-        <div>
-          <h4>Choose Mode</h4>
-          <p>You can instantly test the app in local demo mode, or connect your Supabase credentials.</p>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button id="start-demo-mode" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" type="button" onclick="window.startDemo()">Start in demo mode</button>
-        <p>For a live deployment, configure the Supabase URL and public anon key in <code>js/supabase-config.js</code>, then reload this page.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- TOAST NOTIFICATION CONTAINER -->
 <div id="toast" class="toast"></div>
 
-<!-- JS - SUPABASE -->
-<script type="module" src="./js/supabase-config.js">
-        console.log("Supabase initialized successfully")
-</script>
-
-<!-- JS - order matters because of shared state -->
-<script type="module">
-    import './js/utils.js';
-    import './js/supabase-config.js';
-    import './js/items.js';
-    import './js/ui.js';
-    import './js/app.js';
-</script>
-
-</div>
-
+<!-- JS -->
+<script type="module" src="./js/app.js"></script>
 </body>
 </html>

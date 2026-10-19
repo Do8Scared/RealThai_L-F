@@ -14,7 +14,6 @@ let claimRequests = [];
 let matchRequests = [];
 let items = [];
 let adminUsers = [];
-let demoPreviewActive = false;
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let selectedCalendarDate = localDateKey(new Date());
 const adminViewTitles = {
@@ -27,77 +26,6 @@ const adminViewTitles = {
   matches: 'Owner match submissions',
   profile: 'Profile management',
 };
-
-const demoQueues = {
-  accessRequests: [{
-    id: 'demo-access-1',
-    email: 'casey.student@example.invalid',
-    requested_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-  }],
-  feedbackRequests: [{
-    id: 'demo-feedback-1',
-    email: 'alex.student@example.invalid',
-    topic: 'website',
-    message: 'The item filters are difficult to use on a phone. Keeping them visible while browsing would help.',
-    evidence_image: null,
-    status: 'pending',
-    created_at: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-  }],
-  claimRequests: [{
-    id: 'demo-claim-1',
-    post_number: 184,
-    item_title: 'Black wireless earbuds case',
-    campus: 'A. Mabini Main Campus',
-    claimant_email: 'sam.student@example.invalid',
-    poster_name: 'Taylor Demo',
-    poster_contact: 'demo@example.invalid',
-    message: 'I can identify the sticker inside the charging case.',
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  }],
-  matchRequests: [{
-    id: 'demo-match-1',
-    post_number: 179,
-    item_title: 'Blue student umbrella',
-    campus: 'A. Mabini Main Campus',
-    likely_owner: 'Jordan Demo',
-    contact: 'jordan@example.invalid',
-    proof: 'The handle has a small silver repair near the strap.',
-    created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  }],
-  adminUsers: [{
-    user_id: 'demo-admin',
-    email: 'super-admin@example.invalid',
-    role: 'super_admin',
-    created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-  }, {
-    user_id: 'demo-common-admin',
-    email: 'common-admin@example.invalid',
-    role: 'admin',
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  }],
-  userMetrics: {
-    total_users: 42,
-    active_users_30d: 27,
-    new_users_30d: 6,
-    inactive_users_30d: 11,
-    deleted_users: 4,
-  },
-  items: [
-    { id: 'demo-item-1', post_number: 184, title: 'Black wireless earbuds case', type: 'found', status: 'open', campus: 'A. Mabini Main Campus', location: 'Main Library', created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
-    { id: 'demo-item-2', post_number: 179, title: 'Blue student umbrella', type: 'lost', status: 'open', campus: 'A. Mabini Main Campus', location: 'Student Center', created_at: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString() },
-  ],
-};
-
-function simulateDemoReview(queueName, id, message) {
-  if (!demoPreviewActive) return;
-  const queue = demoQueues[queueName];
-  const index = queue.findIndex(request => request.id === id);
-  if (index < 0) return;
-
-  queue.splice(index, 1);
-  toast(`${message} Demo only; nothing was saved.`, 'success');
-  void loadAdminDashboard();
-}
 
 function showPanel(panel) {
   [authPanel, pendingPanel, dashboard].forEach(section => {
@@ -224,13 +152,6 @@ async function changeAdminRole(userId, role) {
     return;
   }
 
-  if (!supabase && demoPreviewActive) {
-    target.role = role;
-    renderAdmins(adminUsers);
-    toast('Demo role changed locally; nothing was saved.', 'success');
-    return;
-  }
-
   const { error } = await supabase.from('admin_users').update({ role }).eq('user_id', userId);
   if (error) {
     console.error('Admin role update failed:', error);
@@ -251,14 +172,6 @@ async function revokeAdminAccess(userId) {
     return;
   }
   if (!window.confirm(`Revoke administrator access for ${target.email}? Their Supabase account and reports will not be deleted.`)) return;
-
-  if (!supabase && demoPreviewActive) {
-    demoQueues.adminUsers = demoQueues.adminUsers.filter(user => user.user_id !== userId);
-    adminUsers = demoQueues.adminUsers;
-    renderAdmins(adminUsers);
-    toast('Demo admin access revoked locally; nothing was saved.', 'success');
-    return;
-  }
 
   const { error } = await supabase.from('admin_users').delete().eq('user_id', userId);
   if (error) {
@@ -357,14 +270,11 @@ function openRecordDetails(kind, record) {
 
 function formatAccessRequestRef(id) {
   const requestId = String(id || '');
-  if (requestId.startsWith('demo-access-')) {
-    return `AR-DEMO-${requestId.slice('demo-access-'.length).padStart(3, '0')}`;
-  }
   const compactId = requestId.replace(/[^a-z0-9]/gi, '').toUpperCase();
   return `AR-${compactId.slice(0, 12) || 'PENDING'}`;
 }
 
-function renderAccountMetrics(metrics, isDemo = false) {
+function renderAccountMetrics(metrics) {
   const values = Array.isArray(metrics) ? metrics[0] : metrics;
   const fields = [
     ['admin-users-total', 'total_users'],
@@ -378,12 +288,10 @@ function renderAccountMetrics(metrics, isDemo = false) {
     document.getElementById(elementId).textContent = available ? Number(values[field] || 0).toLocaleString('en-PH') : '—';
   });
   document.getElementById('admin-account-metrics-source').textContent = available
-    ? isDemo ? 'Illustrative demo data' : 'Live aggregate'
+    ? 'Live aggregate'
     : 'Unavailable';
   document.getElementById('admin-account-metrics-note').textContent = available
-    ? isDemo
-      ? 'Sample values only. Deleted and inactive accounts are separate; demo actions do not persist.'
-      : 'Deleted accounts are counted from the start of activity tracking. Inactive accounts are not assumed to be deleted.'
+    ? 'Deleted accounts are counted from the start of activity tracking. Inactive accounts are not assumed to be deleted.'
     : 'Apply the admin user activity metrics migration to enable these account totals. Other dashboard data remains available.';
   const chart = document.getElementById('admin-user-chart');
   if (!available) {
@@ -544,28 +452,7 @@ async function requestAdminAccess(user) {
 async function loadAdminDashboard() {
     setStatus(document.getElementById('admin-dashboard-status'), 'Loading review queues...');
     if (!supabase) {
-      if (!demoPreviewActive) return;
-      updateAdminRoleUI();
-      accessRequests = demoQueues.accessRequests;
-        userFeedbackRequests = demoQueues.feedbackRequests;
-      claimRequests = demoQueues.claimRequests;
-      matchRequests = demoQueues.matchRequests;
-      items = demoQueues.items;
-      adminUsers = demoQueues.adminUsers;
-      renderAccessRequests(accessRequests);
-        renderUserFeedbackRequests(userFeedbackRequests);
-      renderClaimRequests(claimRequests);
-      renderOwnerMatchRequests(matchRequests);
-      renderItems(items);
-      renderAdmins(adminUsers);
-      renderOverview(items, accessRequests, userFeedbackRequests, claimRequests, matchRequests);
-      renderAccountMetrics(demoQueues.userMetrics, true);
-      document.getElementById('nav-access-count').textContent = accessRequests.length;
-        document.getElementById('nav-feedback-count').textContent = userFeedbackRequests.length;
-      document.getElementById('nav-claim-count').textContent = claimRequests.length;
-      document.getElementById('nav-match-count').textContent = matchRequests.length;
-      renderCalendar();
-      setStatus(document.getElementById('admin-dashboard-status'), 'Demo preview. Changes are simulated in this browser only.');
+      setStatus(document.getElementById('admin-dashboard-status'), 'Backend is not configured.', true);
       return;
     }
 
@@ -700,7 +587,7 @@ document.getElementById('admin-auth-form').addEventListener('submit', async even
     await sendAuthLink(email, mode);
   } catch (error) {
     console.error('Admin authentication failed:', error);
-    setStatus(authStatus, 'Could not send the login link. Check the email and Supabase Auth settings.', true);
+    setStatus(authStatus, `Could not send the login link: ${error?.message || 'Unknown Supabase Auth error.'}`, true);
   }
 });
 
@@ -768,15 +655,15 @@ document.getElementById('admin-profile-form').addEventListener('submit', async e
   }
 
   try {
-    if (supabase) {
-      const { data, error } = await supabase.auth.updateUser({ data: { display_name: displayName } });
-      if (error) throw error;
-      currentUser = data.user;
-    } else if (demoPreviewActive) {
-      currentUser.user_metadata = { ...currentUser.user_metadata, display_name: displayName };
+    if (!supabase) {
+      setStatus(document.getElementById('admin-profile-status'), 'Backend is not configured.', true);
+      return;
     }
+    const { data, error } = await supabase.auth.updateUser({ data: { display_name: displayName } });
+    if (error) throw error;
+    currentUser = data.user;
     populateProfile(currentUser);
-    setStatus(document.getElementById('admin-profile-status'), supabase ? 'Profile updated.' : 'Demo profile updated in this browser only.');
+    setStatus(document.getElementById('admin-profile-status'), 'Profile updated.');
   } catch (error) {
     console.error('Admin profile update failed:', error);
     setStatus(document.getElementById('admin-profile-status'), 'Could not update your profile. Please try again.', true);
@@ -786,8 +673,6 @@ document.getElementById('admin-profile-form').addEventListener('submit', async e
 document.querySelectorAll('[data-admin-signout]').forEach(button => {
   button.addEventListener('click', async () => {
     if (supabase) await supabase.auth.signOut();
-    demoPreviewActive = false;
-    document.getElementById('admin-demo-notice').hidden = true;
     currentUser = null;
     currentUserRole = '';
     updateAdminRoleUI();
@@ -821,13 +706,7 @@ document.getElementById('admin-access-list').addEventListener('click', async eve
   const approveButton = event.target.closest('[data-approve-admin]');
   const rejectButton = event.target.closest('[data-reject-admin]');
   const button = approveButton || rejectButton;
-  if (!button) return;
-  if (!supabase) {
-    simulateDemoReview('accessRequests', button.dataset.approveAdmin || button.dataset.rejectAdmin,
-      approveButton ? 'Demo access request approved.' : 'Demo access request rejected.');
-    return;
-  }
-  if (!currentUser) return;
+  if (!button || !currentUser || !supabase) return;
 
   const request = accessRequests.find(entry => entry.id === button.dataset.approveAdmin || entry.id === button.dataset.rejectAdmin);
   if (!request) return;
@@ -848,12 +727,7 @@ document.getElementById('admin-access-list').addEventListener('click', async eve
 
 document.getElementById('admin-claim-list').addEventListener('click', async event => {
   const button = event.target.closest('[data-claim-status]');
-  if (!button) return;
-  if (!supabase) {
-    simulateDemoReview('claimRequests', button.dataset.claimId,
-      button.dataset.claimStatus === 'contacted' ? 'Demo claim marked as contacted.' : 'Demo claim request closed.');
-    return;
-  }
+  if (!button || !supabase) return;
 
   const { error } = await supabase.from('claim_followup_requests').update({
     status: button.dataset.claimStatus,
@@ -871,13 +745,7 @@ document.getElementById('admin-claim-list').addEventListener('click', async even
 
 document.getElementById('admin-feedback-list').addEventListener('click', async event => {
   const button = event.target.closest('[data-feedback-status]');
-  if (!button) return;
-  if (!supabase) {
-    simulateDemoReview('feedbackRequests', button.dataset.feedbackId,
-      button.dataset.feedbackStatus === 'reviewed' ? 'Demo feedback marked reviewed.' : 'Demo feedback report closed.');
-    return;
-  }
-  if (!currentUser) return;
+  if (!button || !currentUser || !supabase) return;
 
   const { error } = await supabase.from('user_feedback_reports').update({
     status: button.dataset.feedbackStatus,
@@ -895,13 +763,7 @@ document.getElementById('admin-feedback-list').addEventListener('click', async e
 
 document.getElementById('admin-match-list').addEventListener('click', async event => {
   const button = event.target.closest('[data-owner-status]');
-  if (!button) return;
-  if (!supabase) {
-    simulateDemoReview('matchRequests', button.dataset.ownerId,
-      button.dataset.ownerStatus === 'reviewed' ? 'Demo owner match marked reviewed.' : 'Demo owner match rejected.');
-    return;
-  }
-  if (!currentUser) return;
+  if (!button || !currentUser || !supabase) return;
 
   const { error } = await supabase.from('owner_match_requests').update({
     status: button.dataset.ownerStatus,
@@ -923,19 +785,5 @@ if (supabase) {
     setTimeout(() => { void handleSession(session); }, 0);
   });
 } else {
-  const previewButton = document.getElementById('admin-demo-preview');
-  previewButton.hidden = false;
-  previewButton.addEventListener('click', async () => {
-    demoPreviewActive = true;
-    currentUser = { id: 'demo-admin', email: 'super-admin@example.invalid', user_metadata: { display_name: 'Demo Administrator' } };
-    currentUserRole = 'super_admin';
-    updateAdminRoleUI();
-    document.getElementById('admin-current-email').textContent = 'Demo preview · super-admin@example.invalid';
-    populateProfile(currentUser);
-    document.getElementById('admin-demo-notice').hidden = false;
-    showPanel(dashboard);
-    showAdminView('overview');
-    await loadAdminDashboard();
-  });
-  setStatus(authStatus, 'Demo mode has no secure admin roles. Configure Supabase to use this portal.', true);
+  setStatus(authStatus, 'Supabase is not configured. Check js/supabase-config.js.', true);
 }

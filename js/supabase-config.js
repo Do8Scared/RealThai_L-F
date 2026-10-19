@@ -15,7 +15,7 @@ const isSecretKey = (value) => /sb_secret_/i.test(value || '');
 const hasInvalidCredentials = hasPlaceholderValue(supabaseUrl) || hasPlaceholderValue(supabaseAnonKey) || isSecretKey(supabaseAnonKey);
 
 if (hasInvalidCredentials) {
-  console.warn('Supabase credentials are not configured for browser use yet. Falling back to demo mode.');
+  console.error('Supabase credentials are not configured or invalid. Configure js/supabase-config.js with your project credentials.');
 }
 
 export const supabase = hasInvalidCredentials ? null : createClient(supabaseUrl, supabaseAnonKey);

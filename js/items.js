@@ -1,10 +1,10 @@
 import { supabase } from './supabase-config.js';
-import { toast, DEMO_ITEMS } from './utils.js';
+import { toast } from './utils.js';
 
 const COLLECTION_NAME = 'items';
 
 function normalizeItem(item) {
-    const createdAt = item.created_at || item.createdAt || { seconds: Math.floor(Date.now() / 1000) };
+    const createdAt = item.created_at || item.createdAt || new Date().toISOString();
     return {
         ...item,
         id: item.id,
@@ -14,8 +14,8 @@ function normalizeItem(item) {
 
 export function subscribeToItems(callback, onError = null) {
     if (!supabase) {
-        callback(DEMO_ITEMS);
-        if (onError) onError(new Error('Supabase unavailable; using demo data.'));
+        callback([]);
+        if (onError) onError(new Error('Supabase client not initialized.'));
         return () => {};
     }
 
@@ -32,8 +32,8 @@ export function subscribeToItems(callback, onError = null) {
 
             callback((data || []).map(normalizeItem));
         } catch (error) {
-            console.warn('Supabase unavailable; falling back to demo data.', error);
-            callback(DEMO_ITEMS);
+            console.error('Error loading items from Supabase:', error);
+            callback([]);
             if (onError) onError(error);
         }
     };
@@ -52,29 +52,27 @@ export function subscribeToItems(callback, onError = null) {
             supabase.removeChannel(channel);
         };
     } catch (error) {
-        console.warn('Supabase realtime unavailable; demo mode remains active.', error);
+        console.error('Supabase realtime channel subscription failed:', error);
         return () => {};
     }
 }
 
 // upload item image to Supabase storage if configured
-export async function uploadItemImage(file, isDemo) {
+export async function uploadItemImage(file) {
     if (!file) return '';
-    if (isDemo) {
-        return URL.createObjectURL(file);
-    }
 
     try {
         if (!supabase || !supabase.storage) {
             throw new Error('Supabase storage is not configured');
         }
 
-        const filePath = `items/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-        const { data, error } = await supabase.storage.from('items').upload(filePath, file);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const { data, error } = await supabase.storage.from('item-images').upload(fileName, file);
 
         if (error) throw error;
-        const { publicUrl } = supabase.storage.from('items').getPublicUrl(data.path);
-        return publicUrl;
+        const { data: publicUrlData } = supabase.storage.from('item-images').getPublicUrl(data.path);
+        return publicUrlData?.publicUrl || '';
     } catch (error) {
         console.error('Image upload failed:', error);
         toast('Image upload failed. Please try again.', 'error');
@@ -83,11 +81,7 @@ export async function uploadItemImage(file, isDemo) {
 }
 
 // Submit new report
-export async function submitItemReport(payload, isDemo) {
-    if (isDemo) {
-        return { id: 'd' + Date.now(), ...payload, createdAt: { seconds: Math.floor(Date.now() / 1000) } };
-    }
-
+export async function submitItemReport(payload) {
     if (!supabase) {
         throw new Error('Supabase is not initialized');
     }
@@ -110,8 +104,7 @@ export async function submitItemReport(payload, isDemo) {
 }
 
 // Update existing report item status
-export async function updateItemStatus(id, status, isDemo) {
-    if (isDemo) return true;
+export async function updateItemStatus(id, status) {
     if (!supabase) return false;
 
     const { error } = await supabase
@@ -123,8 +116,7 @@ export async function updateItemStatus(id, status, isDemo) {
 }
 
 // Delete a report item
-export async function deleteItemReport(id, isDemo) {
-    if (isDemo) return true;
+export async function deleteItemReport(id) {
     if (!supabase) return false;
 
     const { error } = await supabase

@@ -7,16 +7,6 @@ export const EMOJI_MAP = {
   'Documents':'📄', 'Other':'📦'
 };
 
-export const DEMO_ITEMS = [
-  { 
-    id: 'd1', post_number: 1, type: 'lost', title: 'Blue Samsung Galaxy A54',
-    description: 'Black case with PUP sticker on back.',
-    category: 'Electronics', campus: 'A. Mabini Main Campus (Sta. Mesa, Manila)', location: 'Main Library, 3rd Floor',
-    reporterName: 'Maria Santos', contact: 'maria@pup.edu.ph',
-    department: 'College of Computer and Information Sciences (CCIS)',
-    status: 'open', imageUrl: '', createdAt: { seconds: Date.now()/1000 - 3600 } 
-  }
-];
 
 export function formatPostId(postNumber) {
   const number = Number(postNumber);
@@ -37,10 +27,20 @@ export function v(id) {
   return (document.getElementById(id)?.value || '').trim(); 
 }
 
-// Format Firestore or object timestamp
+// Format timestamp, ISO string, or Date object
 export function tsDate(ts, long = false) {
   if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date((ts.seconds || Date.now()/1000) * 1000);
+  let d;
+  if (ts instanceof Date) {
+    d = ts;
+  } else if (typeof ts === 'object' && typeof ts.toDate === 'function') {
+    d = ts.toDate();
+  } else if (typeof ts === 'object' && typeof ts.seconds === 'number') {
+    d = new Date(ts.seconds * 1000);
+  } else {
+    d = new Date(ts);
+  }
+  if (Number.isNaN(d.getTime())) return '';
   if (long) return d.toLocaleString('en-PH', { month:'long', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
   return d.toLocaleDateString('en-PH', { month:'short', day:'numeric', year:'numeric' });
 }

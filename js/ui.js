@@ -137,7 +137,7 @@ export function renderAdminQueue(state) {
 
 function cardHTML(i) {
   const em = EMOJI_MAP[i.category] || '📦';
-  const dt = tsDate(i.createdAt);
+  const dt = tsDate(i.created_at || i.createdAt);
   return `
     <div class="item-card" onclick="openDetail('${i.id}', this.querySelector('.card-thumb img')?.src || '')">
       <div class="card-thumb">

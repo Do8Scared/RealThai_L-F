@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Portal | PUP Akademia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>" />
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/admin.css" />
 </head>
@@ -29,9 +33,6 @@
           <button class="btn btn-ghost" type="submit" data-auth-mode="signup">Request admin access</button>
         </div>
       </form>
-      <div class="admin-panel-actions admin-demo-entry">
-        <button id="admin-demo-preview" class="btn btn-ghost" type="button" hidden>Explore demo dashboard</button>
-      </div>
       <p id="admin-auth-status" class="admin-status" role="status" aria-live="polite"></p>
     </section>
 
@@ -57,7 +58,6 @@
           <button class="btn btn-ghost" type="button" data-admin-signout>Sign out</button>
         </div>
       </div>
-      <p id="admin-demo-notice" class="admin-demo-notice" role="status" hidden>Demo preview: sample data only. Review actions are simulated in this browser and are not saved.</p>
 
       <div class="admin-workspace-layout">
         <nav class="admin-sidebar" aria-label="Admin sections">
