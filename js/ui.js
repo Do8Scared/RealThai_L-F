@@ -109,32 +109,6 @@ export function renderAnnouncement(state) {
   `;
 }
 
-export function renderAdminQueue(state) {
-  const box = document.getElementById('admin-queue');
-  if (!box) return;
-
-  if (!state.adminQueue || !state.adminQueue.length) {
-    box.innerHTML = '';
-    return;
-  }
-
-  box.innerHTML = state.adminQueue.map(req => `
-    <div class="admin-queue-item">
-      <div style="display:flex; gap:12px; align-items:flex-start; flex:1;">
-        ${req.evidenceImage ? `<img src="${x(req.evidenceImage)}" alt="Evidence" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);" />` : `<div style="width:72px;height:72px;border-radius:8px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;">📷</div>`}
-        <div>
-          <div class="admin-queue-title">${x(req.itemTitle)}</div>
-          <div class="admin-queue-body">Post ID: ${formatPostId(req.postNumber)}</div>
-          <div class="admin-queue-body">${x(req.campus || 'Campus not specified')}</div>
-          <div class="admin-queue-body">Likely owner: <strong>${x(req.likelyOwner)}</strong></div>
-          <div class="admin-queue-body">${x(req.proof)}</div>
-        </div>
-      </div>
-      <button class="btn btn-primary btn-sm" onclick="publishAnnouncement('${req.id}')">Publish</button>
-    </div>
-  `).join('');
-}
-
 function cardHTML(i) {
   const em = EMOJI_MAP[i.category] || '📦';
   const dt = tsDate(i.created_at || i.createdAt);

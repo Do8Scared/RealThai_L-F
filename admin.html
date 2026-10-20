@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin Portal | PUP Akademia</title>
+  <title>Admin Portal | PUP:IskoFinds</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
@@ -13,18 +13,28 @@
 </head>
 <body class="admin-page">
   <header class="admin-header">
-    <a class="admin-brand" href="index.html" aria-label="PUP Akademia user portal">
-      <span class="admin-brand-seal">PUP</span>
-      <span><strong>PUP Akademia</strong><small>Administrator portal</small></span>
+    <a class="admin-brand" href="index.html" aria-label="PUP:IskoFinds user portal">
+      <span class="admin-brand-seal" aria-hidden="true">
+        <img class="brand-emblem brand-emblem--light" src="assets/brand/iskofinds-jedi.webp" alt="" />
+        <img class="brand-emblem brand-emblem--dark" src="assets/brand/iskofinds-sith.webp" alt="" />
+      </span>
+      <span><strong>PUP:IskoFinds</strong><small>Administrator portal</small></span>
     </a>
-    <a class="admin-user-link" href="index.html">User portal</a>
+    <div class="admin-header-actions">
+      <button class="theme-toggle" type="button" role="switch" aria-checked="true" aria-label="Dark mode" title="Switch to light mode">
+        <span class="theme-toggle-sun" aria-hidden="true">☼</span>
+        <span class="theme-toggle-moon" aria-hidden="true">☾</span>
+        <span class="theme-toggle-orb" aria-hidden="true"><span></span></span>
+      </button>
+      <a class="admin-user-link" href="index.html">User portal</a>
+    </div>
   </header>
 
   <main class="admin-main">
     <section id="admin-auth-panel" class="admin-panel">
       <p class="admin-eyebrow">Restricted access</p>
       <h1>Administrator sign in</h1>
-      <p class="admin-intro">Use your PUP institutional email. New accounts must be approved by an existing administrator.</p>
+      <p class="admin-intro">We use PUP institutional email to help keep admin access within the PUP community. New accounts require approval from an existing administrator.</p>
       <form id="admin-auth-form" class="admin-auth-form">
         <label for="admin-email">Institutional email</label>
         <input id="admin-email" type="email" autocomplete="email" placeholder="name@iskolarngbayan.pup.edu.ph" required />
@@ -34,6 +44,7 @@
         </div>
       </form>
       <p id="admin-auth-status" class="admin-status" role="status" aria-live="polite"></p>
+      <p class="admin-auth-hint">We’ll send a one-time sign-in link to your PUP email. Check your inbox and spam folder before requesting another.</p>
     </section>
 
     <section id="admin-pending-panel" class="admin-panel" hidden>
@@ -49,7 +60,7 @@
     <section id="admin-dashboard" class="admin-workspace" hidden>
       <div class="admin-dashboard-head">
         <div>
-          <p class="admin-eyebrow">PUP Akademia · Administration</p>
+          <p class="admin-eyebrow">PUP:IskoFinds · Administration</p>
           <h1 id="admin-page-title">Dashboard</h1>
           <p class="admin-account-summary"><span id="admin-current-email" class="admin-intro"></span><span id="admin-current-role" class="admin-role-label"></span></p>
         </div>
@@ -72,6 +83,10 @@
           <button class="admin-nav-item" type="button" data-admin-view="matches">Owner matches <span id="nav-match-count">0</span></button>
           <p class="admin-nav-label">Account</p>
           <button class="admin-nav-item" type="button" data-admin-view="profile">Profile management</button>
+          <div class="fb-badge admin-backend-status" role="status">
+            <div class="fb-dot"></div>
+            <span>Supabase ready</span>
+          </div>
         </nav>
 
         <div class="admin-content">
@@ -174,6 +189,7 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="js/theme-toggle.js" defer></script>
   <script type="module" src="js/admin.js"></script>
 </body>
 </html>

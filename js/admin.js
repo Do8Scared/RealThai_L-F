@@ -1,11 +1,15 @@
 import { supabase } from './supabase-config.js';
 import { formatPostId, x, toast } from './utils.js';
+import { createAuthLinkCooldown } from './auth-link-cooldown.js';
 
 const allowedEmail = /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@iskolarngbayan\.pup\.edu\.ph$/i;
 const authPanel = document.getElementById('admin-auth-panel');
 const pendingPanel = document.getElementById('admin-pending-panel');
 const dashboard = document.getElementById('admin-dashboard');
 const authStatus = document.getElementById('admin-auth-status');
+const adminEmailInput = document.getElementById('admin-email');
+const loginButton = document.querySelector('[data-auth-mode="login"]');
+const signupButton = document.querySelector('[data-auth-mode="signup"]');
 let currentUser = null;
 let currentUserRole = '';
 let accessRequests = [];
@@ -52,6 +56,15 @@ function updateAdminRoleUI() {
 function localDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
+
+const adminLinkCooldown = createAuthLinkCooldown({
+  scope: 'pup-auth',
+  input: adminEmailInput,
+  button: loginButton,
+  disabledButtons: [loginButton, signupButton],
+  status: authStatus,
+  getIdleLabel: () => 'Send login link',
+});
 
 function showAdminView(view) {
   if (!adminViewTitles[view]) return;
@@ -560,6 +573,11 @@ async function sendAuthLink(email, mode) {
     return;
   }
 
+  if (adminLinkCooldown.isCoolingDown(email)) {
+    adminLinkCooldown.refresh(email);
+    return;
+  }
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
@@ -569,9 +587,12 @@ async function sendAuthLink(email, mode) {
   });
   if (error) throw error;
 
-  setStatus(authStatus, mode === 'signup'
-    ? 'Verification link sent. After verifying, your admin access request will be submitted for approval.'
-    : 'Login link sent. Check your institutional email.');
+  adminLinkCooldown.start(
+    email,
+    mode === 'signup'
+      ? `Verification email requested for ${email}. Check your inbox and spam folder. After verification, your admin request awaits approval.`
+      : `Login email requested for ${email}. Check your inbox and spam folder before requesting another.`
+  );
 }
 
 document.getElementById('admin-auth-form').addEventListener('submit', async event => {
@@ -583,11 +604,14 @@ document.getElementById('admin-auth-form').addEventListener('submit', async even
 
   const mode = event.submitter?.dataset.authMode || 'login';
   const email = document.getElementById('admin-email').value.trim();
+  adminLinkCooldown.setPending(true);
   try {
     await sendAuthLink(email, mode);
   } catch (error) {
     console.error('Admin authentication failed:', error);
     setStatus(authStatus, `Could not send the login link: ${error?.message || 'Unknown Supabase Auth error.'}`, true);
+  } finally {
+    adminLinkCooldown.setPending(false);
   }
 });
 

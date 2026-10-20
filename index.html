@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>PUP Akademia — Lost &amp; Found</title>
+<title>PUP:IskoFinds — Lost &amp; Found</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
@@ -13,39 +13,64 @@
 <body>
   <!-- AUTH MODAL (Login / Sign Up) -->
 <!-- FULL-SCREEN AUTH GATE OVERLAY -->
-<div id="auth-gate" style="position: fixed; inset: 0; background: var(--maroon-dk); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
-  <div style="background: var(--card); border-radius: var(--r-xl); padding: 32px; width: 100%; max-width: 420px; box-shadow: var(--shadow-float); text-align: center;">
-    
-    <div style="width: 60px; height: 60px; background: var(--gold-lt); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 16px;">
-      PUP
-    </div>
-    
-    <h2 style="font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; color: var(--maroon); margin-bottom: 6px;">PUP Akademia</h2>
-    <p style="font-size: 13.5px; color: var(--ink-3); margin-bottom: 20px;">Lost &amp; Found Portal. Verify your official institutional email to proceed.</p>
-
-    <!-- TAB SWITCHER FOR LOGIN / SIGNUP -->
-    <div style="display: flex; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r); padding: 4px; margin-bottom: 18px;">
-      <button type="button" id="tab-login" class="btn btn-sm" style="flex: 1; justify-content: center; background: var(--maroon); color: #fff;" onclick="window.switchAuthTab('login')">Log In</button>
-      <button type="button" id="tab-signup" class="btn btn-sm btn-ghost" style="flex: 1; justify-content: center; border: none;" onclick="window.switchAuthTab('signup')">Sign Up</button>
-    </div>
-
-    <div class="field" style="text-align: left; margin-bottom: 16px;">
-      <label id="auth-label-text">Institutional Email *</label>
-      <input type="email" id="gate-email" placeholder="e.g. name@iskolarngbayan.pup.edu.ph" style="width: 100%;" />
+<div id="auth-gate" class="auth-gate">
+  <button class="theme-toggle theme-toggle--auth" type="button" role="switch" aria-checked="true" aria-label="Dark mode" title="Switch to light mode">
+    <span class="theme-toggle-sun" aria-hidden="true">☼</span>
+    <span class="theme-toggle-moon" aria-hidden="true">☾</span>
+    <span class="theme-toggle-orb" aria-hidden="true"><span></span></span>
+  </button>
+  <section class="auth-gate-panel" aria-labelledby="auth-title">
+    <div class="auth-brand">
+      <span class="brand-seal brand-seal--auth" aria-hidden="true">
+        <img class="brand-emblem brand-emblem--light" src="assets/brand/iskofinds-jedi.webp" alt="" />
+        <img class="brand-emblem brand-emblem--dark" src="assets/brand/iskofinds-sith.webp" alt="" />
+      </span>
+      <div>
+        <h1 id="auth-title" class="auth-title">PUP:IskoFinds</h1>
+        <p class="auth-subtitle">Lost &amp; Found Portal</p>
+      </div>
     </div>
 
-    <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="window.handleGateLogin()" id="auth-submit-btn">Send Login Magic Link</button>
-    <a href="admin.html" style="display:block;margin-top:16px;font-size:12px;color:var(--maroon);text-decoration:none;">Administrator sign in</a>
-  </div>
+    <p class="auth-intro">Use your PUP institutional email to help keep this service for the PUP community.</p>
+
+    <div class="auth-tabs" role="group" aria-label="Choose sign-in or account creation">
+      <button type="button" id="tab-login" class="auth-tab active" aria-pressed="true" onclick="window.switchAuthTab('login')">Log In</button>
+      <button type="button" id="tab-signup" class="auth-tab" aria-pressed="false" onclick="window.switchAuthTab('signup')">Create Account</button>
+    </div>
+
+    <div class="auth-field">
+      <label id="auth-label-text" for="gate-email">Institutional email</label>
+      <input type="email" id="gate-email" autocomplete="email" placeholder="name@iskolarngbayan.pup.edu.ph" />
+    </div>
+
+    <button class="btn btn-primary auth-submit" onclick="window.handleGateLogin()" id="auth-submit-btn">
+      <span class="auth-submit-label">Send sign-in link</span>
+      <span class="auth-submit-clip" aria-hidden="true"></span>
+      <span class="auth-submit-arrow auth-submit-arrow-left" aria-hidden="true"></span>
+      <span class="auth-submit-arrow auth-submit-arrow-right" aria-hidden="true"></span>
+      <span class="auth-submit-corner auth-submit-corner-top-left" aria-hidden="true"></span>
+      <span class="auth-submit-corner auth-submit-corner-top-right" aria-hidden="true"></span>
+      <span class="auth-submit-corner auth-submit-corner-bottom-left" aria-hidden="true"></span>
+      <span class="auth-submit-corner auth-submit-corner-bottom-right" aria-hidden="true"></span>
+    </button>
+    <p id="auth-status" class="auth-status" role="status" aria-live="polite"></p>
+    <p class="auth-hint">We’ll email a one-time sign-in link. Check your inbox and spam folder before requesting another.</p>
+    <a class="auth-admin-link" href="admin.html">Administrator sign in</a>
+  </section>
 </div>
 
 <div class="shell" id="app-shell" style="display: none;">
   <!-- SIDEBAR (Desktop) -->
   <aside class="sidebar">
     <div class="sidebar-brand">
-      <div class="brand-seal"> PUP </div>
-      <div class="brand-name">PUP Akademia</div>
-      <div class="brand-sub">Lost &amp; Found System</div>
+      <span class="brand-seal" aria-hidden="true">
+        <img class="brand-emblem brand-emblem--light" src="assets/brand/iskofinds-jedi.webp" alt="" />
+        <img class="brand-emblem brand-emblem--dark" src="assets/brand/iskofinds-sith.webp" alt="" />
+      </span>
+      <div class="sidebar-brand-copy">
+        <div class="brand-name">PUP:IskoFinds</div>
+        <div class="brand-sub">Lost &amp; Found System</div>
+      </div>
     </div>
     <!-- HOME. -->
     <nav class="sidebar-nav">
@@ -63,6 +88,9 @@
       <button class="nav-item" data-sec="my-reports">
         <span class="nav-icon">👤</span> My Reports
       </button>
+      <button class="nav-item" data-sec="journey">
+        <span class="nav-icon">📖</span> My Journey
+      </button>
 
       <div class="nav-section-label">Actions</div>
       <button class="nav-item" onclick="openReport()">
@@ -73,10 +101,11 @@
       </button>
     </nav>
     <div class="sidebar-footer">
-      <div class="fb-badge">
-        <div class="fb-dot" id="fb-dot"></div>
-        <span id="fb-lbl">Supabase ready</span>
-      </div>
+      <button class="theme-toggle theme-toggle--sidebar" type="button" role="switch" aria-checked="true" aria-label="Dark mode" title="Switch to light mode">
+        <span class="theme-toggle-sun" aria-hidden="true">☼</span>
+        <span class="theme-toggle-moon" aria-hidden="true">☾</span>
+        <span class="theme-toggle-orb" aria-hidden="true"><span></span></span>
+      </button>
       <button class="logout-btn" type="button" id="logout-btn">Log out</button>
     </div>
   </aside>
@@ -84,9 +113,17 @@
   <!-- MOBILE TOPBAR -->
   <header class="topbar">
     <div class="topbar-brand">
-      <div class="topbar-seal">PUP</div>
-      <div class="topbar-name">PUP Akademia</div>
+      <span class="topbar-seal" aria-hidden="true">
+        <img class="brand-emblem brand-emblem--light" src="assets/brand/iskofinds-jedi.webp" alt="" />
+        <img class="brand-emblem brand-emblem--dark" src="assets/brand/iskofinds-sith.webp" alt="" />
+      </span>
+      <div class="topbar-name">PUP:IskoFinds</div>
     </div>
+    <button class="theme-toggle theme-toggle--topbar" type="button" role="switch" aria-checked="true" aria-label="Dark mode" title="Switch to light mode">
+      <span class="theme-toggle-sun" aria-hidden="true">☼</span>
+      <span class="theme-toggle-moon" aria-hidden="true">☾</span>
+      <span class="theme-toggle-orb" aria-hidden="true"><span></span></span>
+    </button>
     <button class="btn btn-primary btn-sm" onclick="openReport()">+ Report</button>
   </header>
 
@@ -218,7 +255,7 @@
     <section id="sec-my-reports" class="section">
       <div class="page-header">
         <h1>My Reports</h1>
-        <p>Track the reports you submitted and update their status.</p>
+        <p>Track your reports and confirm successful handoffs with the other participant.</p>
       </div>
       <div class="page-body">
         <div class="cards-grid" id="my-reports-grid">
@@ -227,6 +264,65 @@
             <p>Loading your reports...</p>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- SECTION: COMIC REWARDS -->
+    <section id="sec-journey" class="section">
+      <div class="page-header">
+        <h1>My Journey</h1>
+        <p>Every confirmed return unlocks a chapter and advances your rank. Earn badges at milestones.</p>
+      </div>
+      <div class="page-body journey-page">
+        <div class="journey-summary">
+          <article class="journey-rank-card">
+            <span class="journey-eyebrow">Current rank</span>
+            <h2 id="journey-rank">New Isko</h2>
+            <p><strong id="journey-reunion-count">0</strong> confirmed handoffs</p>
+          </article>
+          <article class="journey-progress-card">
+            <div class="journey-progress-heading">
+              <div>
+                <span class="journey-eyebrow">Comic progress</span>
+                <h2><span id="journey-chapter-count">0</span> chapters unlocked</h2>
+              </div>
+              <span class="journey-progress-icon" aria-hidden="true">📚</span>
+            </div>
+            <p id="journey-next-rank">Complete a confirmed handoff to unlock Chapter 1.</p>
+          </article>
+        </div>
+
+        <section class="journey-panel" aria-labelledby="journey-pending-heading">
+          <div class="journey-section-heading">
+            <div>
+              <h2 id="journey-pending-heading">Handoff confirmations</h2>
+              <p>Starting a handoff counts as your confirmation. The other participant must sign in and confirm before it is completed; no email notification is sent.</p>
+            </div>
+          </div>
+          <div id="journey-transactions" class="journey-transactions" aria-live="polite">
+            <p class="journey-empty">Your handoff activity will appear here.</p>
+          </div>
+        </section>
+
+        <section class="journey-panel" aria-labelledby="journey-badges-heading">
+          <div class="journey-section-heading">
+            <div>
+              <h2 id="journey-badges-heading">Achievements</h2>
+              <p>Milestones earned through confirmed returns.</p>
+            </div>
+          </div>
+          <div id="journey-badges" class="journey-badges"></div>
+        </section>
+
+        <section class="journey-panel" aria-labelledby="journey-chapters-heading">
+          <div class="journey-section-heading">
+            <div>
+              <h2 id="journey-chapters-heading">Comic chapters</h2>
+              <p>Artwork by the PUP:IskoFinds design team will appear in each unlocked chapter.</p>
+            </div>
+          </div>
+          <div id="journey-chapters" class="journey-chapters"></div>
+        </section>
       </div>
     </section>
 
@@ -239,6 +335,7 @@
   <button class="mob-btn" data-sec="items"><span class="mn-icon">📋</span>Browse</button>
   <button class="mob-btn" onclick="openReport()"><span class="mn-icon">➕</span>Report</button>
   <button class="mob-btn" data-sec="my-reports"><span class="mn-icon">👤</span>My Reports</button>
+  <button class="mob-btn" data-sec="journey"><span class="mn-icon">📖</span>Journey</button>
   <button class="mob-btn" type="button" onclick="window.openFeedbackSheet()"><span class="mn-icon">💬</span>Feedback</button>
 </nav>
 
@@ -375,6 +472,30 @@
   </div>
 </div>
 
+<!-- HANDOFF CONFIRMATION MODAL -->
+<div class="overlay" id="handoff-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Confirm a successful handoff</h2>
+      <button class="modal-close" type="button" onclick="window.closeModal('handoff-overlay')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="handoff-modal-copy">Enter the other participant's verified PUP institutional email. Starting this handoff records your confirmation; they must sign in and confirm before the report is marked resolved and rewards are unlocked. No email notification is sent, so ask them to check My Journey.</p>
+      <form id="handoff-form">
+        <input type="hidden" id="handoff-item-id" />
+        <div class="field">
+          <label for="handoff-partner-email">Other participant's PUP email</label>
+          <input id="handoff-partner-email" type="email" autocomplete="email" placeholder="name@iskolarngbayan.pup.edu.ph" required />
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="window.closeModal('handoff-overlay')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="handoff-submit">Start handoff</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- OWNER MATCH ADMIN REVIEW MODAL -->
 <div class="overlay" id="owner-match-overlay" style="display:none;">
   <div class="modal">
@@ -490,6 +611,7 @@
 <div id="toast" class="toast"></div>
 
 <!-- JS -->
+<script src="./js/theme-toggle.js" defer></script>
 <script type="module" src="./js/app.js"></script>
 </body>
 </html>

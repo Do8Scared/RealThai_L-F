@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * PUP AKADEMIA - APP.JS FUNCTION INDEX
+ * PUP:IskoFinds - APP.JS FUNCTION INDEX
  * ==============================================================================
  * 1. window.openReport()         - Opens the report item modal overlay.
  * 2. window.closeModal(modalId)  - Closes any modal overlay by its ID.
@@ -12,51 +12,44 @@
  * 8. window.setFType(type)       - Toggles between 'lost' and 'found' report modes.
  * 9. window.submitReport()       - Validates, uploads image, and posts new report.
  * 10. renderMyReports()          - Renders user's personal reports view.
- * 11. window.updateItemStatus()  - Toggles item status (open/resolved).
- * 12. window.openClaimModal()    - Opens the item claim verification modal.
- * 13. window.submitClaim()       - Validates and submits user item claims.
+ * 11. window.openHandoffModal()  - Starts a two-party item handoff confirmation.
+ * 12. window.confirmHandoff()    - Confirms the other side of a successful return.
+ * 13. window.cancelHandoff()     - Cancels a pending handoff as its initiator.
  * ==============================================================================
  */
 
 import { supabase } from './supabase-config.js';
 import { renderAll } from './ui.js';
-import { toast, formatPostId, x } from './utils.js';
+import { toast, formatPostId, tsDate, x } from './utils.js';
+import { createAuthLinkCooldown } from './auth-link-cooldown.js';
+import { COMIC_CHAPTERS } from './comic-chapters.js';
 
 const state = {
   items: [],
+  handoffs: [],
   activeType: '',
   userEmail: '',
   userId: '',
-  adminQueue: [],
-  activeAnnouncement: null,
-  announcementReports: [],
-  feedbackReports: [],
-  claimFollowupRequests: [],
 };
 
-function addActivity(itemId, activity) {
-  const item = state.items.find(i => i.id === itemId);
-  if (!item) return;
+const JOURNEY_RANKS = [
+    { light: 'New Isko', dark: 'New Isko' },
+    { light: 'Campus Scout', dark: 'Shadow Scout' },
+    { light: 'Item Seeker', dark: 'Night Tracker' },
+    { light: 'Return Ally', dark: 'Dark Ally' },
+    { light: 'Isko Guardian', dark: 'Shadow Guardian' },
+    { light: 'Campus Champion', dark: 'Eclipse Champion' },
+    { light: 'PUP Protector', dark: 'Night Protector' },
+    { light: 'Isko Legend', dark: 'Shadow Legend' },
+    { light: 'PUP Hero', dark: 'Midnight Hero' },
+];
 
-  item.activity = item.activity || [];
-  item.activity.unshift({
-    id: `evt_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`,
-    actor: activity.actor || 'System',
-    type: activity.type || 'update',
-    message: activity.message || '',
-    timestamp: Date.now(),
-    imageUrl: activity.imageUrl || '',
-  });
-}
-
-function addAnnouncementReport(report) {
-  state.announcementReports = state.announcementReports || [];
-  state.announcementReports.unshift({
-    id: `ann_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`,
-    ...report,
-    timestamp: Date.now(),
-  });
-}
+const JOURNEY_BADGES = [
+    { count: 1, title: 'First Reunion', description: 'Complete your first confirmed handoff.', icon: '🤝' },
+    { count: 3, title: 'Campus Helper', description: 'Help reunite three belongings with their people.', icon: '🏅' },
+    { count: 5, title: 'Trusted Returner', description: 'Complete five successful handoffs.', icon: '⭐' },
+    { count: 8, title: 'Isko Legend', description: 'Unlock every chapter in the first comic collection.', icon: '🏆' },
+];
 
 function isAllowedInstitutionalEmail(email) {
     return /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@iskolarngbayan\.pup\.edu\.ph$/i.test(email);
@@ -111,13 +104,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (supabase) {
         supabase.auth.onAuthStateChange((_event, session) => {
             const email = session?.user?.email || '';
+            if (state.userId !== (session?.user?.id || '')) {
+                state.handoffs = [];
+            }
             if (isAllowedInstitutionalEmail(email)) {
                 state.userId = session.user.id;
                 unlockAppShell(email);
                 void fetchAndSyncItems();
             } else {
                 state.userId = '';
+                state.handoffs = [];
                 lockAppShell();
+            }
+            if (document.getElementById('sec-journey')?.classList.contains('active')) {
+                void loadMyJourney();
             }
         });
     }
@@ -125,6 +125,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initAppNavigation();
     bindReportButtons();
     initFilterListeners();
+    document.getElementById('handoff-form')?.addEventListener('submit', startHandoff);
+    new MutationObserver(() => {
+        if (document.getElementById('sec-journey')?.classList.contains('active')) {
+            renderMyJourney();
+        }
+    }).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
 });
 
 function bindReportButtons() {
@@ -148,8 +154,6 @@ function initAppNavigation() {
             const targetSec = button.getAttribute('data-sec');
             if (!targetSec) return;
 
-            console.log(`Switching to section: ${targetSec}`);
-
             document.querySelectorAll('[data-sec], .mob-btn, .nav-item').forEach(btn => {
                 btn.classList.remove('active');
             });
@@ -170,6 +174,9 @@ function initAppNavigation() {
                 // Trigger specific tab renders if needed
                 if (targetSec === 'my-reports') {
                     renderMyReports(state);
+                }
+                if (targetSec === 'journey') {
+                    void loadMyJourney();
                 }
             } else {
                 console.warn(`Target section element for "${targetSec}" not found in DOM.`);
@@ -402,36 +409,18 @@ function renderMyReports(state) {
                 <p style="font-size: 13px; margin-bottom: 12px;">Status: <strong>${x(item.status)}</strong></p>
                 
                 <div style="display: flex; gap: 8px;">
-                    ${item.status === 'open' ? `
-                        <button class="btn btn-sm btn-primary" onclick="window.updateItemStatus('${x(item.id)}', 'resolved')">Mark Resolved</button>
-                    ` : `
-                        <button class="btn btn-sm btn-ghost" onclick="window.updateItemStatus('${x(item.id)}', 'open')">Reopen</button>
-                    `}
+                    ${item.status === 'open' && item.user_id === state.userId ? `
+                        <button class="btn btn-sm btn-primary" onclick="window.openHandoffModal('${x(item.id)}')">Confirm handoff</button>
+                    ` : item.status === 'claimed' ? `
+                        <span class="journey-inline-status">Handoff awaiting confirmation</span>
+                    ` : item.status === 'resolved' ? `
+                        <span class="journey-inline-status">Handoff confirmed</span>
+                    ` : ''}
                 </div>
             </div>
         </div>
     `).join('');
 }
-
-window.publishAnnouncement = (requestId) => {
-    const request = state.adminQueue.find(r => r.id === requestId);
-    if (!request) return;
-
-    state.activeAnnouncement = {
-        title: 'Owner identified',
-        text: `${request.likelyOwner} has been flagged as the likely owner of “${request.itemTitle}.” Contact the reporter for confirmation and update the claim.`,
-        reports: state.announcementReports || [],
-    };
-
-    state.adminQueue = state.adminQueue.filter(r => r.id !== requestId);
-    addAnnouncementReport({
-        type: 'announcement_published',
-        actor: 'Admin',
-        message: `Published announcement for ${request.itemTitle}.`,
-    });
-    toast('Announcement published to the home banner.', 'success');
-    renderAll(state);
-};
 
 let selectedFeedbackTopic = '';
 
@@ -644,36 +633,285 @@ window.submitFeedback = async (event) => {
     renderAll(state);
 };
 
-window.updateItemStatus = async (itemId, newStatus) => {
-    if (!supabase) {
-        toast('Backend is not configured.', 'error');
-        return;
-    }
+window.openHandoffModal = (itemId) => {
+   const item = state.items.find(record => record.id === itemId);
+   const modal = document.getElementById('handoff-overlay');
+   const hiddenItemId = document.getElementById('handoff-item-id');
+   const partnerEmail = document.getElementById('handoff-partner-email');
+   if (!item || item.user_id !== state.userId || item.status !== 'open' || !modal || !hiddenItemId) {
+       toast('Only the author of an open report can start its handoff.', 'error');
+       return;
+   }
 
-    const { error } = await supabase
-        .from('items')
-        .update({ status: newStatus })
-        .eq('id', itemId);
+   hiddenItemId.value = itemId;
+   if (partnerEmail) partnerEmail.value = '';
+   modal.style.display = 'flex';
+   requestAnimationFrame(() => modal.classList.add('open'));
+};
 
-    if (error) {
-        console.error('Error updating status:', error);
-        toast('Failed to update status.', 'error');
-        return;
-    }
+async function startHandoff(event) {
+   event.preventDefault();
+   const itemId = document.getElementById('handoff-item-id')?.value;
+   const partnerEmail = document.getElementById('handoff-partner-email')?.value.trim();
+   const submitButton = document.getElementById('handoff-submit');
+   const item = state.items.find(record => record.id === itemId);
 
-    toast(`Item marked as ${newStatus}!`, 'success');
-    
-    const itemIndex = state.items.findIndex(i => i.id === itemId);
-    if (itemIndex > -1) {
-        state.items[itemIndex].status = newStatus;
-        addActivity(itemId, {
-            actor: 'Admin',
-            type: 'status_changed',
-            message: `Status changed to ${newStatus}.`,
-        });
-        renderAll(state);
-        renderMyReports(state);
-    }
+   if (!supabase) {
+       toast('Backend is not configured.', 'error');
+       return;
+   }
+   if (!item || item.user_id !== state.userId || item.status !== 'open') {
+       toast('This report is no longer available to start a handoff.', 'error');
+       return;
+   }
+   if (!partnerEmail || !isAllowedInstitutionalEmail(partnerEmail)) {
+       toast('Enter the other participant’s PUP institutional email.', 'error');
+       return;
+   }
+
+   if (submitButton) {
+       submitButton.disabled = true;
+       submitButton.textContent = 'Starting…';
+   }
+   try {
+       const { error } = await supabase.rpc('start_handoff_confirmation', {
+           p_item_id: itemId,
+           p_partner_email: partnerEmail,
+       });
+       if (error) {
+           console.error('Handoff start failed:', error);
+           toast(error.message || 'Could not start this handoff.', 'error');
+           return;
+       }
+
+       toast('Handoff started. The other participant must confirm to complete it.', 'success');
+       window.closeModal('handoff-overlay');
+       await fetchAndSyncItems();
+       await loadMyJourney();
+       renderMyReports(state);
+   } catch (error) {
+       console.error('Unexpected handoff start failure:', error);
+       toast('Could not start this handoff. Please try again.', 'error');
+   } finally {
+       if (submitButton) {
+           submitButton.disabled = false;
+           submitButton.textContent = 'Start handoff';
+       }
+   }
+}
+
+async function loadMyJourney() {
+   const transactionList = document.getElementById('journey-transactions');
+   if (!transactionList) return;
+   if (!supabase || !state.userId) {
+       state.handoffs = [];
+       renderMyJourney();
+       transactionList.innerHTML = '<p class="journey-empty">Sign in to view your journey.</p>';
+       return;
+   }
+
+   state.handoffs = [];
+   renderMyJourney();
+   transactionList.innerHTML = '<p class="journey-empty">Loading handoff activity…</p>';
+   const requestedUserId = state.userId;
+   try {
+       const { data, error } = await supabase
+           .from('handoff_transactions')
+           .select('id, item_id, initiator_id, partner_id, status, created_at, completed_at')
+           .order('created_at', { ascending: false });
+       if (error) {
+           if (state.userId !== requestedUserId) return;
+           console.error('Handoff history load failed:', error);
+           transactionList.innerHTML = '<p class="journey-empty journey-error">Could not load handoff activity. Please try again later.</p>';
+           toast('Could not load your reward progress.', 'error');
+           return;
+       }
+
+       if (state.userId !== requestedUserId) return;
+       state.handoffs = data || [];
+       renderMyJourney();
+   } catch (error) {
+       if (state.userId !== requestedUserId) return;
+       console.error('Unexpected handoff history load failure:', error);
+       transactionList.innerHTML = '<p class="journey-empty journey-error">Could not load handoff activity. Please try again later.</p>';
+       toast('Could not load your reward progress.', 'error');
+   }
+}
+
+function renderMyJourney() {
+   const completedCount = state.handoffs.filter(transaction => transaction.status === 'completed').length;
+   const rankIndex = Math.min(completedCount, JOURNEY_RANKS.length - 1);
+   const theme = document.body.dataset.theme === 'light' ? 'light' : 'dark';
+   const nextChapterNumber = completedCount + 1;
+   const nextChapter = getComicChapter(nextChapterNumber);
+   const rank = document.getElementById('journey-rank');
+   const reunionCount = document.getElementById('journey-reunion-count');
+   const chapterCount = document.getElementById('journey-chapter-count');
+   const nextRank = document.getElementById('journey-next-rank');
+
+   const rankLabel = JOURNEY_RANKS[rankIndex][theme];
+   if (rank) {
+       rank.textContent = completedCount >= JOURNEY_RANKS.length - 1
+           ? `${rankLabel} · Rank ${completedCount}`
+           : rankLabel;
+   }
+   if (reunionCount) reunionCount.textContent = completedCount;
+   if (chapterCount) chapterCount.textContent = completedCount;
+   if (nextRank) {
+       nextRank.textContent = `Confirm a successful handoff to unlock ${nextChapter.title}.`;
+   }
+
+   renderJourneyBadges(completedCount);
+   renderJourneyChapters(completedCount);
+   renderJourneyTransactions();
+}
+
+function renderJourneyBadges(completedCount) {
+   const container = document.getElementById('journey-badges');
+   if (!container) return;
+   container.innerHTML = JOURNEY_BADGES.map(badge => {
+       const earned = completedCount >= badge.count;
+       return `
+           <article class="journey-badge${earned ? ' is-earned' : ' is-locked'}">
+               <span class="journey-badge-icon" aria-hidden="true">${badge.icon}</span>
+               <div>
+                   <h3>${x(badge.title)}</h3>
+                   <p>${x(badge.description)}</p>
+                   <span class="journey-badge-state">${earned ? 'Earned' : `${badge.count} confirmed handoff${badge.count === 1 ? '' : 's'} required`}</span>
+               </div>
+           </article>`;
+   }).join('');
+}
+
+function renderJourneyChapters(unlockedCount) {
+   const container = document.getElementById('journey-chapters');
+   if (!container) return;
+   const totalChaptersToShow = Math.max(COMIC_CHAPTERS.length, unlockedCount + 1);
+   const chaptersToShow = Array.from({ length: totalChaptersToShow }, (_, index) => getComicChapter(index + 1));
+   container.innerHTML = chaptersToShow.map(chapter => {
+       const unlocked = chapter.number <= unlockedCount;
+       const cover = unlocked && chapter.cover
+           ? `<img class="journey-chapter-cover" src="${x(chapter.cover)}" alt="${x(chapter.title)} cover" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="journey-chapter-placeholder" hidden>Artwork will appear here when provided by the design team.</span>`
+           : '';
+       const placeholder = unlocked && !chapter.cover
+           ? '<span class="journey-chapter-placeholder">Artwork will appear here when provided by the design team.</span>'
+           : '';
+       const pages = unlocked && chapter.pages.length
+           ? `<div class="journey-chapter-pages">${chapter.pages.map((page, index) => `
+               <img src="${x(page)}" alt="${x(chapter.title)} page ${index + 1}" loading="lazy" onerror="this.hidden=true">
+             `).join('')}</div>`
+           : '';
+       return `
+           <article class="journey-chapter${unlocked ? ' is-unlocked' : ' is-locked'}">
+               <div class="journey-chapter-art">
+                   ${cover}
+                   ${placeholder}
+                   ${unlocked ? '' : '<span class="journey-lock-icon" aria-hidden="true">🔒</span>'}
+               </div>
+               <div class="journey-chapter-info">
+                   <span class="journey-chapter-kicker">${unlocked ? 'Unlocked' : `Unlock after handoff ${chapter.number}`}</span>
+                   <h3>${x(chapter.title)}</h3>
+                   ${unlocked ? pages : '<p>Complete one more confirmed handoff to read this chapter.</p>'}
+               </div>
+           </article>`;
+   }).join('');
+}
+
+function getComicChapter(number) {
+   return COMIC_CHAPTERS.find(chapter => chapter.number === number) || {
+       number,
+       title: `Chapter ${number}`,
+       cover: '',
+       pages: [],
+   };
+}
+
+function renderJourneyTransactions() {
+   const container = document.getElementById('journey-transactions');
+   if (!container) return;
+   if (!state.handoffs.length) {
+       container.innerHTML = '<p class="journey-empty">No handoffs yet. Start one from an open report in My Reports after returning an item.</p>';
+       return;
+   }
+
+   container.innerHTML = state.handoffs.map(transaction => {
+       const item = state.items.find(record => record.id === transaction.item_id);
+       const title = item?.title || 'Lost-and-found report';
+       const isInitiator = transaction.initiator_id === state.userId;
+       const status = transaction.status;
+       let message = status === 'completed'
+           ? `Both participants confirmed on ${tsDate(transaction.completed_at, true)}.`
+           : status === 'cancelled'
+               ? 'This handoff was cancelled.'
+               : isInitiator
+                   ? 'You confirmed. Waiting for the other participant.'
+                   : 'Confirm only if the item has been returned to its owner.';
+       const actions = status === 'pending'
+           ? isInitiator
+               ? `<button class="btn btn-sm btn-ghost" type="button" onclick="window.cancelHandoff('${x(transaction.id)}')">Cancel handoff</button>`
+               : `<button class="btn btn-sm btn-primary" type="button" onclick="window.confirmHandoff('${x(transaction.id)}')">Confirm return</button>`
+           : '';
+       return `
+           <article class="journey-transaction">
+               <div class="journey-transaction-copy">
+                   <div class="journey-transaction-title">${x(title)} <span class="journey-transaction-status journey-status-${x(status)}">${x(status)}</span></div>
+                   <p>${x(message)}</p>
+               </div>
+               ${actions}
+           </article>`;
+   }).join('');
+}
+
+window.confirmHandoff = async (transactionId) => {
+   if (!supabase) {
+       toast('Backend is not configured.', 'error');
+       return;
+   }
+   try {
+       const { data, error } = await supabase.rpc('confirm_handoff_confirmation', {
+           p_transaction_id: transactionId,
+       });
+       if (error) {
+           console.error('Handoff confirmation failed:', error);
+           toast(error.message || 'Could not confirm this handoff.', 'error');
+           return;
+       }
+       if (data === 'completed') {
+           toast('Return confirmed! Your comic chapter and rank progress have been updated.', 'success');
+       } else {
+           toast('Your confirmation was recorded.', 'success');
+       }
+       await fetchAndSyncItems();
+       await loadMyJourney();
+       renderMyReports(state);
+   } catch (error) {
+       console.error('Unexpected handoff confirmation failure:', error);
+       toast('Could not confirm this handoff. Please try again.', 'error');
+   }
+};
+
+window.cancelHandoff = async (transactionId) => {
+   if (!supabase) {
+       toast('Backend is not configured.', 'error');
+       return;
+   }
+   try {
+       const { error } = await supabase.rpc('cancel_handoff_confirmation', {
+           p_transaction_id: transactionId,
+       });
+       if (error) {
+           console.error('Handoff cancellation failed:', error);
+           toast(error.message || 'Could not cancel this handoff.', 'error');
+           return;
+       }
+       toast('Handoff cancelled.', 'success');
+       await fetchAndSyncItems();
+       await loadMyJourney();
+       renderMyReports(state);
+   } catch (error) {
+       console.error('Unexpected handoff cancellation failure:', error);
+       toast('Could not cancel this handoff. Please try again.', 'error');
+   }
 };
 
 
@@ -864,9 +1102,21 @@ window.submitOwnerMatch = async (e) => {
 // ==========================================
 
 let authMode = 'login';
+let authSubmitAnimationTimeout;
+const authEmailInput = document.getElementById('gate-email');
+const authSubmitButton = document.getElementById('auth-submit-btn');
+const authStatus = document.getElementById('auth-status');
+const authLinkCooldown = createAuthLinkCooldown({
+    scope: 'pup-auth',
+    input: authEmailInput,
+    button: authSubmitButton,
+    status: authStatus,
+    getIdleLabel: () => authMode === 'login' ? 'Send sign-in link' : 'Create account & send link',
+});
 
 window.switchAuthTab = (mode) => {
     if (mode !== 'login' && mode !== 'signup') return;
+    const modeChanged = authMode !== mode;
     authMode = mode;
 
     const loginTab = document.getElementById('tab-login');
@@ -874,20 +1124,29 @@ window.switchAuthTab = (mode) => {
     const submitButton = document.getElementById('auth-submit-btn');
     const label = document.getElementById('auth-label-text');
 
-    loginTab?.classList.toggle('btn-primary', mode === 'login');
-    loginTab?.classList.toggle('btn-ghost', mode !== 'login');
-    signupTab?.classList.toggle('btn-primary', mode === 'signup');
-    signupTab?.classList.toggle('btn-ghost', mode !== 'signup');
-    if (loginTab) {
-        loginTab.style.background = mode === 'login' ? 'var(--maroon)' : '';
-        loginTab.style.color = mode === 'login' ? '#fff' : '';
+    loginTab?.classList.toggle('active', mode === 'login');
+    signupTab?.classList.toggle('active', mode === 'signup');
+    loginTab?.setAttribute('aria-pressed', String(mode === 'login'));
+    signupTab?.setAttribute('aria-pressed', String(mode === 'signup'));
+    if (submitButton) {
+        const submitLabel = submitButton.querySelector('.auth-submit-label');
+        if (submitLabel) {
+            submitLabel.textContent = mode === 'login' ? 'Send sign-in link' : 'Create account & send link';
+        } else {
+            submitButton.textContent = mode === 'login' ? 'Send sign-in link' : 'Create account & send link';
+        }
+        if (modeChanged) {
+            submitButton.classList.remove('is-changing');
+            void submitButton.offsetWidth;
+            submitButton.classList.add('is-changing');
+            clearTimeout(authSubmitAnimationTimeout);
+            authSubmitAnimationTimeout = setTimeout(() => {
+                submitButton.classList.remove('is-changing');
+            }, 1300);
+        }
     }
-    if (signupTab) {
-        signupTab.style.background = mode === 'signup' ? 'var(--maroon)' : '';
-        signupTab.style.color = mode === 'signup' ? '#fff' : '';
-    }
-    if (submitButton) submitButton.textContent = mode === 'login' ? 'Send Login Magic Link' : 'Create Account';
-    if (label) label.textContent = mode === 'login' ? 'Institutional Email *' : 'Institutional Email for your account *';
+    if (label) label.textContent = mode === 'login' ? 'Institutional email' : 'Institutional email for your account';
+    authLinkCooldown.refresh(authEmailInput?.value || '');
 };
 
 async function checkAuthGate() {
@@ -932,17 +1191,27 @@ function lockAppShell() {
 }
 
 window.handleGateLogin = async () => {
-    const email = document.getElementById('gate-email')?.value.trim() || '';
+    const email = authEmailInput?.value.trim() || '';
     if (!isAllowedInstitutionalEmail(email)) {
+        authStatus.textContent = 'Enter a valid @iskolarngbayan.pup.edu.ph address.';
+        authStatus.classList.add('error');
         toast('Access restricted to valid @iskolarngbayan.pup.edu.ph emails only.', 'error');
         return;
     }
 
+    if (authLinkCooldown.isCoolingDown(email)) {
+        authLinkCooldown.refresh(email);
+        return;
+    }
+
     if (!supabase) {
+        authStatus.textContent = 'Backend is not configured.';
+        authStatus.classList.add('error');
         toast('Backend is not configured.', 'error');
         return;
     }
 
+    authLinkCooldown.setPending(true);
     try {
         const redirectUrl = window.location.origin + window.location.pathname;
         const { error } = await supabase.auth.signInWithOtp({
@@ -959,10 +1228,18 @@ window.handleGateLogin = async () => {
             return;
         }
 
-        toast('Magic link sent. Verify your email to continue.', 'success');
+        authLinkCooldown.start(
+            email,
+            `Sign-in email requested for ${email}. Check your inbox and spam folder.`
+        );
+        toast('Sign-in email requested. Check your inbox and spam folder.', 'success');
     } catch (error) {
         console.error('Unexpected auth error:', error);
+        authStatus.textContent = 'Could not request a sign-in email. Please try again shortly.';
+        authStatus.classList.add('error');
         toast('An unexpected authentication error occurred.', 'error');
+    } finally {
+        authLinkCooldown.setPending(false);
     }
 };
 
