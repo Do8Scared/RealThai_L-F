@@ -663,9 +663,71 @@ function renderItems(items) {
         <span>${x(item.type || 'item').toUpperCase()} · ${x(item.status || 'open')}</span>
         <span>${x(item.campus || 'Campus not specified')} · ${x(item.location || 'Location not specified')}</span>
       </div>
-      <div class="admin-record-actions"><button class="btn btn-ghost btn-sm" type="button" data-admin-details="item" data-record-id="${x(item.id)}">Details</button></div>
+      <div class="admin-record-actions">
+        <button class="btn btn-ghost btn-sm" type="button" data-admin-details="item" data-record-id="${x(item.id)}">Details</button>
+        <button class="btn btn-danger btn-sm" type="button" data-admin-delete-item="${x(item.id)}">Delete post</button>
+      </div>
     </article>
     `).join('');
+}
+
+function getItemImageStoragePath(imageUrl) {
+  if (!imageUrl) return '';
+  try {
+    const pathname = new URL(imageUrl).pathname;
+    const marker = '/storage/v1/object/public/item-images/';
+    const pathStart = pathname.indexOf(marker);
+    return pathStart === -1 ? '' : decodeURIComponent(pathname.slice(pathStart + marker.length));
+  } catch {
+    return '';
+  }
+}
+
+async function deleteItemPost(itemId, button) {
+  const item = items.find(entry => entry.id === itemId);
+  if (!item || !currentUser || !supabase) return;
+  const confirmation = `Permanently delete ${formatPostId(item.post_number)} — "${item.title}"?\n\nThis removes the post and its associated handoff history. Any comic reward progress earned from those handoffs will also be removed.`;
+  if (!window.confirm(confirmation)) return;
+
+  button.disabled = true;
+  try {
+    const { data, error } = await supabase.from('items')
+      .delete()
+      .eq('id', item.id)
+      .select('id')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('The post was not found or administrator delete access was denied.');
+
+    const imagePath = getItemImageStoragePath(item.imageUrl);
+    let imageCleanupFailed = false;
+    if (imagePath) {
+      try {
+        const { error: storageError } = await supabase.storage.from('item-images').remove([imagePath]);
+        if (storageError) throw storageError;
+      } catch (storageError) {
+        imageCleanupFailed = true;
+        console.error(`Item post ${item.id} was deleted, but its image could not be removed:`, storageError);
+      }
+    }
+
+    try {
+      await loadAdminDashboard();
+      toast(
+        imageCleanupFailed
+          ? 'Post deleted, but its image could not be removed from storage.'
+          : 'Item post deleted.',
+        imageCleanupFailed ? 'error' : 'success',
+      );
+    } catch (refreshError) {
+      console.error('Item post was deleted but the admin dashboard could not refresh:', refreshError);
+      toast('Post deleted. Refresh the admin portal to update the list.', 'error');
+    }
+  } catch (error) {
+    console.error('Item post deletion failed:', error);
+    toast(error?.message || 'Could not delete this item post.', 'error');
+    button.disabled = false;
+  }
 }
 
 async function requestAdminAccess(user) {
@@ -853,6 +915,11 @@ document.querySelectorAll('[data-admin-view]').forEach(button => {
 });
 
 document.addEventListener('click', event => {
+  const deleteItemButton = event.target.closest('[data-admin-delete-item]');
+  if (deleteItemButton) {
+    void deleteItemPost(deleteItemButton.dataset.adminDeleteItem, deleteItemButton);
+    return;
+  }
   const detailsButton = event.target.closest('[data-admin-details]');
   if (detailsButton) {
     const records = {
