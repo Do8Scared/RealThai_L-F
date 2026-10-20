@@ -1,8 +1,13 @@
 .env
 .env.*
+!.env.example
+!.env.*.example
+.envrc
 js/env.js
 .env.local
 .env.*.local
+.npmrc
+!.npmrc.example
 
 # Local credentials and private keys
 credentials.json
@@ -11,9 +16,23 @@ service-account*.json
 *.key
 *.p12
 *.pfx
+*.p8
+*.jks
+*.keystore
+*.mobileprovision
 *.secret
 *.secrets
 secrets/
+**/id_rsa
+**/id_ed25519
+
+# Local database exports and state
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.tfstate
+*.tfstate.*
 
 # Local tooling state
 .supabase/

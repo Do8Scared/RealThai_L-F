@@ -91,6 +91,9 @@
       <button class="nav-item" data-sec="journey">
         <span class="nav-icon">📖</span> My Journey
       </button>
+      <button class="nav-item" data-sec="announcements">
+        <span class="nav-icon">📣</span> Promote Announcement
+      </button>
 
       <div class="nav-section-label">Actions</div>
       <button class="nav-item" onclick="openReport()">
@@ -138,14 +141,13 @@
         <div class="page-header-actions">
           <button class="btn btn-primary" onclick="openReport()">Report Lost or Found Item</button>
           <button class="btn btn-ghost-on-maroon" onclick="goTo('items')">Browse All Items</button>
+          <button class="btn btn-ghost-on-maroon" onclick="goTo('announcements')">Promote Announcement</button>
         </div>
       </div>
       <div class="page-body">
-        <div id="announcement-banner" class="announcement-strip" role="status" aria-live="polite">
+        <div id="announcement-banner" class="announcement-strip" role="status" aria-live="polite" style="display:none;">
           <div class="announcement-tag">Announcement</div>
-          <div class="announcement-copy">
-            <strong>Lost and Found Week:</strong> Claim your items at the Student Center from 9:00 AM to 4:00 PM this Friday.
-          </div>
+          <div class="announcement-copy"></div>
         </div>
 
         <div class="home-grid">
@@ -326,6 +328,58 @@
       </div>
     </section>
 
+    <!-- SECTION: PAID ANNOUNCEMENTS -->
+    <section id="sec-announcements" class="section">
+      <div class="page-header">
+        <h1>Promote an Announcement</h1>
+        <p>Submit your announcement for review. Pay only after an admin approves the text; it will be posted once payment is verified.</p>
+      </div>
+      <div class="page-body announcement-page">
+        <section class="announcement-promotion-panel" aria-labelledby="announcement-request-heading">
+          <div>
+            <p class="announcement-promotion-rate">PHP 10 per hour · choose 1–5 hours</p>
+            <h2 id="announcement-request-heading">Request a paid announcement</h2>
+            <p>Choose how long you want your announcement to run. Admins review and may edit your text before payment. You pay the displayed total only after approval; your announcement is published after receipt verification.</p>
+          </div>
+          <form id="announcement-request-form" class="announcement-request-form" onsubmit="window.submitAnnouncementRequest(event)">
+            <div class="field">
+              <label for="announcement-request-title">Headline</label>
+              <input id="announcement-request-title" name="title" type="text" maxlength="100" required />
+            </div>
+            <div class="field">
+              <label for="announcement-request-message">Announcement text</label>
+              <textarea id="announcement-request-message" name="message" rows="4" maxlength="500" required></textarea>
+            </div>
+            <div class="field">
+              <label for="announcement-request-duration">Posting duration · PHP 10 per hour</label>
+              <select id="announcement-request-duration" name="duration-hours" required>
+                <option value="1">1 hour · PHP 10</option>
+                <option value="2">2 hours · PHP 20</option>
+                <option value="3">3 hours · PHP 30</option>
+                <option value="4">4 hours · PHP 40</option>
+                <option value="5">5 hours · PHP 50</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <span id="announcement-request-status" class="announcement-request-status" role="status" aria-live="polite"></span>
+              <button class="btn btn-primary" type="submit">Submit for review</button>
+            </div>
+          </form>
+        </section>
+        <section class="announcement-requests-panel" aria-labelledby="my-announcements-heading">
+          <div class="journey-section-heading">
+            <div>
+              <h2 id="my-announcements-heading">My announcement requests</h2>
+              <p>Review status, approved payment details, and receipt verification for your submissions.</p>
+            </div>
+          </div>
+          <div id="my-announcement-requests" class="my-announcement-requests" aria-live="polite">
+            <p class="announcement-request-empty">Your submissions will appear here.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -336,6 +390,7 @@
   <button class="mob-btn" onclick="openReport()"><span class="mn-icon">➕</span>Report</button>
   <button class="mob-btn" data-sec="my-reports"><span class="mn-icon">👤</span>My Reports</button>
   <button class="mob-btn" data-sec="journey"><span class="mn-icon">📖</span>Journey</button>
+  <button class="mob-btn" data-sec="announcements"><span class="mn-icon">📣</span>Promote</button>
   <button class="mob-btn" type="button" onclick="window.openFeedbackSheet()"><span class="mn-icon">💬</span>Feedback</button>
 </nav>
 

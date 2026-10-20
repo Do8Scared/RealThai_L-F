@@ -63,7 +63,6 @@ body{
 .auth-tab:hover{background:rgba(139,26,26,.07)}
 .auth-tab.active{background:var(--maroon); color:#fff; border-color:var(--maroon);box-shadow:0 2px 7px rgba(92,16,16,.18)}
 .auth-tab:focus-visible,.auth-admin-link:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
-.auth-form{display:flex;flex-direction:column;gap:14px}
 .auth-field{display:flex;flex-direction:column;gap:6px}
 .auth-field label{font-size:12px;font-weight:600;color:var(--ink-2)}
 .auth-field input{
@@ -244,8 +243,6 @@ body{
 .btn-ghost:hover{border-color:var(--maroon);color:var(--maroon)}
 .btn-ghost-on-maroon{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.45)}
 .btn-ghost-on-maroon:hover{background:rgba(255,255,255,.1);border-color:#fff;color:#fff}
-.btn-maroon{background:var(--maroon);color:#fff}
-.btn-maroon:hover{background:var(--maroon-dk)}
 .btn-danger{background:var(--red-bg);color:var(--red);border:1.5px solid #FECACA}
 .btn-danger:hover{background:#FEE2E2}
 .btn-sm{padding:7px 14px;font-size:13px}
@@ -787,11 +784,11 @@ body[data-theme="light"] .admin-brand-seal{
 }
 .card-foot{background:rgba(255,255,255,.38)}
 .btn{border-radius:9px}
-.btn-primary,.btn-maroon,.btn-danger,.btn-ghost{
+.btn-primary,.btn-danger,.btn-ghost{
   border:1.5px solid rgba(75,14,24,.26);
   box-shadow:2px 3px 0 rgba(75,14,24,.14);
 }
-.btn-primary:hover,.btn-maroon:hover,.btn-danger:hover,.btn-ghost:hover{transform:translateY(-1px);box-shadow:3px 4px 0 rgba(75,14,24,.18)}
+.btn-primary:hover,.btn-danger:hover,.btn-ghost:hover{transform:translateY(-1px);box-shadow:3px 4px 0 rgba(75,14,24,.18)}
 .btn:active{transform:translateY(1px);box-shadow:none}
 .toolbar{border-radius:12px 18px}
 .search-box input,.select-sm,.field input,.field select,.field textarea{
@@ -1287,4 +1284,82 @@ body[data-theme="light"] .journey-error{color:#a82222}
   .journey-panel{padding:15px}
   .journey-transaction{align-items:flex-start;flex-direction:column}
   .journey-transaction .btn{align-self:flex-start}
+}
+
+.announcement-page{display:grid;gap:18px}
+.announcement-promotion-panel,.announcement-requests-panel{
+  min-width:0;padding:22px;border:1.5px solid rgba(255,255,255,.28);border-radius:var(--r-lg);
+  background:rgba(39,12,18,.62);color:#fff;box-shadow:var(--shadow-card);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)
+}
+.announcement-promotion-panel h2,.announcement-requests-panel h2{color:#fff;font-family:'DM Serif Display',Georgia,serif;font-size:22px;font-weight:400}
+.announcement-promotion-panel>div>p:last-child,.announcement-requests-panel .journey-section-heading p{margin-top:5px;color:rgba(255,255,255,.72);font-size:13px}
+.announcement-promotion-rate{display:inline-block;margin-bottom:8px;padding:4px 9px;border:1px solid rgba(244,197,66,.58);border-radius:99px;color:#ffe5a0;font-size:11px;font-weight:700}
+.announcement-request-form{display:grid;gap:12px;margin-top:16px}
+.announcement-request-form .field label,.announcement-payment-form label{display:grid;gap:5px;color:rgba(255,255,255,.88);font-size:12px;font-weight:700}
+.announcement-request-form input,.announcement-request-form textarea,.announcement-request-form select,.announcement-payment-form input,.announcement-payment-form select{
+  width:100%;padding:10px 12px;border:1px solid rgba(255,255,255,.24);border-radius:var(--r-sm);
+  background:rgba(25,8,12,.5);color:#fff;font:inherit
+}
+.announcement-request-form textarea{resize:vertical}
+.announcement-request-form input:focus,.announcement-request-form textarea:focus,.announcement-request-form select:focus,.announcement-payment-form input:focus,.announcement-payment-form select:focus{outline:2px solid var(--gold-lt)}
+.announcement-request-form .form-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.announcement-request-status{color:#ffe5a0;font-size:12px}
+.my-announcement-requests{display:grid;gap:12px;margin-top:14px}
+.announcement-request-card{padding:16px;border:1px solid rgba(255,255,255,.22);border-radius:var(--r);background:rgba(16,7,10,.28);color:#fff}
+.announcement-request-card h3{margin:12px 0 5px;color:#fff;font-size:16px}
+.announcement-request-copy,.announcement-request-card>p{color:rgba(255,255,255,.78);font-size:13px;white-space:pre-wrap}
+.announcement-request-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.announcement-request-card-head time{color:rgba(255,255,255,.58);font-size:10px}
+.announcement-request-status{display:inline-flex;padding:4px 8px;border:1px solid rgba(244,197,66,.4);border-radius:99px;color:#ffe5a0;font-size:10px;font-weight:700}
+.announcement-request-status--published{border-color:rgba(120,220,153,.48);color:#a6f0ba}
+.announcement-request-status--rejected{border-color:rgba(255,151,151,.48);color:#ffb7b7}
+.announcement-request-price{margin-top:8px;color:#ffe5a0;font-size:12px;font-weight:700}
+.announcement-admin-note{margin-top:9px;padding:8px 10px;border-left:3px solid var(--gold-lt);background:rgba(255,255,255,.07);font-size:12px}
+.announcement-payment-details{margin-top:12px;padding:12px;border-radius:var(--r-sm);background:rgba(255,255,255,.08)}
+.announcement-payment-details>strong{color:#ffe5a0;font-size:12px}
+.announcement-payment-details p{margin-top:6px;color:rgba(255,255,255,.83);font-size:12px;overflow-wrap:anywhere}
+.announcement-payment-link{color:#ffe5a0;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.announcement-copy+.announcement-copy{padding-top:10px;border-top:1px solid rgba(75,14,24,.18)}
+.announcement-payment-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:10px;margin-top:12px}
+.announcement-payment-form .btn{grid-column:1/-1;justify-self:start}
+.announcement-request-empty{padding:14px;color:rgba(255,255,255,.7);font-size:13px}
+.announcement-strip .announcement-copy strong{display:block}
+body[data-theme="light"] .announcement-promotion-panel,
+body[data-theme="light"] .announcement-requests-panel{
+  border-color:rgba(75,14,24,.15);background:rgba(255,251,244,.86);color:var(--ink)
+}
+body[data-theme="light"] .announcement-promotion-panel h2,
+body[data-theme="light"] .announcement-requests-panel h2,
+body[data-theme="light"] .announcement-request-card h3{color:var(--maroon-dk)}
+body[data-theme="light"] .announcement-promotion-panel>div>p:last-child,
+body[data-theme="light"] .announcement-requests-panel .journey-section-heading p{color:var(--ink-2)}
+body[data-theme="light"] .announcement-request-form .field label,
+body[data-theme="light"] .announcement-payment-form label{color:var(--ink-2)}
+body[data-theme="light"] .announcement-request-form input,
+body[data-theme="light"] .announcement-request-form textarea,
+body[data-theme="light"] .announcement-request-form select,
+body[data-theme="light"] .announcement-payment-form input,
+body[data-theme="light"] .announcement-payment-form select{
+  border-color:rgba(75,14,24,.2);background:rgba(255,255,255,.8);color:var(--ink)
+}
+body[data-theme="light"] .announcement-request-status{color:var(--maroon-dk)}
+body[data-theme="light"] .announcement-request-card{
+  border-color:rgba(75,14,24,.15);background:rgba(255,255,255,.72);color:var(--ink)
+}
+body[data-theme="light"] .announcement-request-copy,
+body[data-theme="light"] .announcement-request-card>p{color:var(--ink-2)}
+body[data-theme="light"] .announcement-request-card-head time{color:var(--ink-3)}
+body[data-theme="light"] .announcement-request-status--published{color:#176e3a}
+body[data-theme="light"] .announcement-request-status--rejected{color:#a82222}
+body[data-theme="light"] .announcement-request-price,
+body[data-theme="light"] .announcement-payment-details>strong{color:var(--maroon)}
+body[data-theme="light"] .announcement-payment-details{background:rgba(75,14,24,.06)}
+body[data-theme="light"] .announcement-payment-details p{color:var(--ink-2)}
+body[data-theme="light"] .announcement-payment-link{color:var(--maroon)}
+body[data-theme="light"] .announcement-request-empty{color:var(--ink-3)}
+@media(max-width:768px){
+  .announcement-promotion-panel,.announcement-requests-panel{padding:16px}
+  .announcement-payment-form{grid-template-columns:1fr}
+  .announcement-payment-form .btn{grid-column:auto}
 }

@@ -13,6 +13,9 @@ const signupButton = document.querySelector('[data-auth-mode="signup"]');
 let currentUser = null;
 let currentUserRole = '';
 let accessRequests = [];
+let announcementRequests = [];
+let announcementPaymentSettings = null;
+let comicChapters = [];
 let userFeedbackRequests = [];
 let claimRequests = [];
 let matchRequests = [];
@@ -25,6 +28,8 @@ const adminViewTitles = {
   users: 'User management',
   calendar: 'Calendar',
   access: 'Admin access requests',
+  comics: 'Comic chapter editor',
+  announcements: 'Announcement requests',
   feedback: 'User feedback',
   claims: 'Claim follow-ups',
   matches: 'Owner match submissions',
@@ -85,6 +90,7 @@ function getCalendarEntries() {
   return [
     ...items.map(item => ({ date: item.created_at, title: item.title, kind: 'Item reported', view: 'overview' })),
     ...accessRequests.map(request => ({ date: request.requested_at, title: request.email, kind: 'Admin access requested', view: 'access' })),
+    ...announcementRequests.map(request => ({ date: request.created_at, title: request.title, kind: 'Announcement request', view: 'announcements' })),
     ...userFeedbackRequests.map(request => ({ date: request.created_at, title: request.topic === 'announcement' ? 'Announcement report' : 'Website feedback', kind: 'User feedback', view: 'feedback' })),
     ...claimRequests.map(request => ({ date: request.created_at, title: request.item_title, kind: 'Claim follow-up', view: 'claims' })),
     ...matchRequests.map(request => ({ date: request.created_at, title: request.item_title, kind: 'Owner match', view: 'matches' })),
@@ -104,11 +110,30 @@ async function signPrivateEvidence(requests, bucket) {
   }));
 }
 
-function renderOverview(items, access, feedback, claims, matches) {
+async function signAnnouncementReceipts(requests) {
+  return Promise.all(requests.map(async request => {
+    if (!request.payment_proof_path) return { ...request, payment_proof_url: '' };
+    try {
+      const { data, error } = await supabase.storage
+        .from('announcement-payment-evidence')
+        .createSignedUrl(request.payment_proof_path, 300);
+      if (error) {
+        console.error(`Could not open payment proof for announcement ${request.id}:`, error);
+        return { ...request, payment_proof_url: '' };
+      }
+      return { ...request, payment_proof_url: data?.signedUrl || '' };
+    } catch (error) {
+      console.error(`Could not create a signed payment proof URL for announcement ${request.id}:`, error);
+      return { ...request, payment_proof_url: '' };
+    }
+  }));
+}
+
+function renderOverview(items, access, announcements, feedback, claims, matches) {
   const openItems = items.filter(item => (item.status || 'open') !== 'resolved');
   const lostItems = items.filter(item => (item.type || '').toLowerCase() === 'lost');
   const foundItems = items.filter(item => (item.type || '').toLowerCase() === 'found');
-  const queueTotal = access.length + feedback.length + claims.length + matches.length;
+  const queueTotal = access.length + announcements.length + feedback.length + claims.length + matches.length;
   document.getElementById('overview-items').textContent = openItems.length;
   document.getElementById('overview-lost').textContent = lostItems.length;
   document.getElementById('overview-found').textContent = foundItems.length;
@@ -122,7 +147,7 @@ function renderOverview(items, access, feedback, claims, matches) {
   ].map(([label, count]) => `<div class="admin-chart-row"><span>${label}</span><div class="admin-chart-track"><div class="admin-chart-fill" style="--bar-width:${Math.round(count / itemMax * 100)}%"></div></div><strong>${count}</strong></div>`).join('');
 
   const queueChart = document.getElementById('admin-queue-chart');
-  const queues = [['Admin access', access.length], ['User feedback', feedback.length], ['Claim follow-ups', claims.length], ['Owner matches', matches.length]];
+  const queues = [['Admin access', access.length], ['Announcements', announcements.length], ['User feedback', feedback.length], ['Claim follow-ups', claims.length], ['Owner matches', matches.length]];
   const queueMax = Math.max(...queues.map(([, count]) => count), 1);
   queueChart.innerHTML = queues.map(([label, count]) => `<div class="admin-chart-row"><span>${label}</span><div class="admin-chart-track"><div class="admin-chart-fill" style="--bar-width:${Math.round(count / queueMax * 100)}%"></div></div><strong>${count}</strong></div>`).join('');
 
@@ -404,6 +429,69 @@ function renderUserFeedbackRequests(requests, unavailable = false) {
   `).join('');
 }
 
+function renderAnnouncementRequests(requests, unavailable = false) {
+  const container = document.getElementById('admin-announcement-list');
+  document.getElementById('admin-announcement-count').textContent = unavailable ? '—' : requests.length;
+  if (unavailable) {
+    container.innerHTML = '<p class="admin-empty">Announcement requests are unavailable. Apply the paid announcements migration.</p>';
+    return;
+  }
+  if (!requests.length) {
+    container.innerHTML = '<p class="admin-empty">No announcement requests are waiting for review or payment verification.</p>';
+    return;
+  }
+
+  container.innerHTML = requests.map(request => {
+    const submittedOn = new Date(request.created_at).toLocaleString('en-PH');
+    if (request.status === 'pending_review') {
+      return `<article class="admin-record admin-record-stacked admin-announcement-record">
+        <div class="admin-record-main">
+          <strong>Content review · ${x(request.email)}</strong>
+          <span>Submitted ${x(submittedOn)}</span>
+          <p class="admin-announcement-submitted-copy"><b>Submitted headline:</b> ${x(request.title)}<br><b>Submitted text:</b> ${x(request.message)}</p>
+        </div>
+        <div class="admin-announcement-review-fields">
+          <label>Approved headline<input type="text" maxlength="100" data-announcement-title="${x(request.id)}" value="${x(request.title)}" /></label>
+          <label>Approved announcement text<textarea rows="3" maxlength="500" data-announcement-message="${x(request.id)}">${x(request.message)}</textarea></label>
+          <p>Requested duration: <strong>${x(request.requested_duration_hours)} hour${request.requested_duration_hours === 1 ? '' : 's'} · PHP ${x(request.requested_duration_hours * 10)}</strong></p>
+          <label>Note for user (required when rejecting)<textarea rows="2" data-announcement-note="${x(request.id)}" placeholder="Explain edits or why the announcement cannot be approved."></textarea></label>
+          <div class="admin-record-actions">
+            <button class="btn btn-primary btn-sm" type="button" data-announcement-action="approve-text" data-announcement-id="${x(request.id)}">Approve text &amp; request payment</button>
+            <button class="btn btn-danger btn-sm" type="button" data-announcement-action="reject-text" data-announcement-id="${x(request.id)}">Reject text</button>
+          </div>
+        </div>
+      </article>`;
+    }
+
+    if (request.status === 'payment_submitted') {
+      return `<article class="admin-record admin-record-stacked admin-announcement-record">
+        <div class="admin-record-main">
+          <strong>Payment verification · ${x(request.email)}</strong>
+          <span>${x(request.payment_method === 'gcash' ? 'GCash' : 'MariBank')} · ${x(request.duration_hours)} hour${request.duration_hours === 1 ? '' : 's'} · PHP ${x(request.amount_due)}</span>
+          <h3>${x(request.approved_title)}</h3>
+          <p>${x(request.approved_message)}</p>
+          ${request.payment_proof_url ? `<a class="admin-announcement-proof" href="${x(request.payment_proof_url)}" target="_blank" rel="noopener noreferrer">View uploaded receipt</a>` : '<span class="admin-view-note">Receipt could not be opened. Refresh before verifying.</span>'}
+          <span>Submitted ${x(submittedOn)}</span>
+        </div>
+        <label>Note if requesting new proof<textarea rows="2" data-announcement-note="${x(request.id)}" placeholder="Explain why the receipt could not be verified."></textarea></label>
+        <div class="admin-record-actions">
+          <button class="btn btn-primary btn-sm" type="button" data-announcement-action="verify-payment" data-announcement-id="${x(request.id)}" ${request.payment_proof_url ? '' : 'disabled'}>Verify payment &amp; publish</button>
+          <button class="btn btn-danger btn-sm" type="button" data-announcement-action="reject-payment" data-announcement-id="${x(request.id)}">Request new receipt</button>
+        </div>
+      </article>`;
+    }
+
+    return `<article class="admin-record admin-record-stacked admin-announcement-record">
+      <div class="admin-record-main">
+        <strong>Awaiting user payment · ${x(request.email)}</strong>
+        <span>${x(request.duration_hours)} hour${request.duration_hours === 1 ? '' : 's'} · PHP ${x(request.amount_due)}</span>
+        <h3>${x(request.approved_title)}</h3>
+        <p>${x(request.approved_message)}</p>
+      </div>
+    </article>`;
+  }).join('');
+}
+
 function renderOwnerMatchRequests(requests) {
   const container = document.getElementById('admin-match-list');
   document.getElementById('admin-match-count').textContent = requests.length;
@@ -429,6 +517,135 @@ function renderOwnerMatchRequests(requests) {
       </div>
     </article>
   `).join('');
+}
+
+const comicPageMaxCount = 50;
+const comicPathPattern = /^assets\/comics\/[A-Za-z0-9._/-]+$/;
+const comicImageExtensionPattern = /\.(?:jpe?g|png|webp|gif|avif)$/i;
+
+function getComicArtworkUrl(path) {
+  return path ? `./${path}` : '';
+}
+
+function isValidComicPath(path) {
+  return comicPathPattern.test(path)
+    && comicImageExtensionPattern.test(path)
+    && path.split('/').every(part => part && part !== '.' && part !== '..');
+}
+
+function parseComicPagePaths(value) {
+  return value.split('\n').map(path => path.trim()).filter(Boolean);
+}
+
+function validateComicPaths(coverPath, pagePaths) {
+  if (coverPath && !isValidComicPath(coverPath)) {
+    return 'Cover path must be an image file inside assets/comics/.';
+  }
+  if (pagePaths.length > comicPageMaxCount) {
+    return `Enter no more than ${comicPageMaxCount} page paths.`;
+  }
+  if (pagePaths.some(path => !isValidComicPath(path))) {
+    return 'Each page path must be an image file inside assets/comics/.';
+  }
+  return '';
+}
+
+function renderComicChapters(chapters, unavailable = false) {
+  const container = document.getElementById('admin-comic-chapter-list');
+  document.getElementById('admin-comic-count').textContent = unavailable ? '—' : chapters.length;
+  if (unavailable) {
+    container.innerHTML = '<p class="admin-empty">Comic chapters are unavailable. Apply the comic chapter editor migration.</p>';
+    return;
+  }
+  if (!chapters.length) {
+    container.innerHTML = '<p class="admin-empty">No comic chapters. Create one above to get started.</p>';
+    return;
+  }
+
+  container.innerHTML = chapters.map(chapter => {
+    const coverUrl = getComicArtworkUrl(chapter.cover_path);
+    const pageUrls = (chapter.page_paths || []).map(getComicArtworkUrl);
+    return `<article class="admin-section admin-comic-chapter${chapter.is_archived ? ' is-archived' : ''}">
+      <div class="admin-comic-chapter-header">
+        <div><span class="admin-comic-chapter-number">Chapter ${chapter.chapter_number}</span><span class="admin-comic-chapter-state">${chapter.is_archived ? 'Archived' : 'Active'}</span></div>
+        <div class="admin-comic-preview">
+          ${coverUrl ? `<a href="${x(coverUrl)}" target="_blank" rel="noopener noreferrer"><img src="${x(coverUrl)}" alt="${x(chapter.title)} cover" loading="lazy"></a>` : '<span class="admin-comic-no-cover">No cover</span>'}
+          ${pageUrls.slice(0, 5).map((url, index) => `<a href="${x(url)}" target="_blank" rel="noopener noreferrer"><img src="${x(url)}" alt="${x(chapter.title)} page ${index + 1}" loading="lazy"></a>`).join('')}
+          ${pageUrls.length > 5 ? `<span class="admin-comic-more-pages">+${pageUrls.length - 5}</span>` : ''}
+        </div>
+      </div>
+      <form class="admin-comic-form admin-comic-edit-form" data-comic-id="${x(chapter.id)}">
+        <label>Chapter title<input name="title" type="text" maxlength="120" value="${x(chapter.title)}" required /></label>
+        <label>Story description <span class="admin-optional">(optional)</span><textarea name="description" rows="2" maxlength="1000">${x(chapter.description || '')}</textarea></label>
+        <label>Cover image path <span class="admin-optional">(optional)</span><input name="cover-path" type="text" value="${x(chapter.cover_path || '')}" placeholder="assets/comics/chapter-01/cover.webp" /></label>
+        <label>Page image paths <span class="admin-optional">(one local path per line, in reading order)</span><textarea name="page-paths" rows="4">${x((chapter.page_paths || []).join('\n'))}</textarea></label>
+        <div class="admin-comic-form-actions">
+          <p class="admin-status" role="status" aria-live="polite"></p>
+          <div class="admin-record-actions">
+            <button class="btn btn-primary btn-sm" type="submit">Save chapter</button>
+            <button class="${chapter.is_archived ? 'btn btn-ghost' : 'btn btn-danger'} btn-sm" type="button" data-comic-archive="${x(chapter.id)}" data-archive-state="${chapter.is_archived ? 'true' : 'false'}">${chapter.is_archived ? 'Restore chapter' : 'Archive chapter'}</button>
+          </div>
+        </div>
+      </form>
+    </article>`;
+  }).join('');
+}
+
+async function createComicChapter(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.getElementById('comic-chapter-create-status');
+  const button = form.querySelector('button[type="submit"]');
+  const title = form.elements.namedItem('title').value.trim();
+  const description = form.elements.namedItem('description').value.trim();
+  const coverPath = form.elements.namedItem('cover-path').value.trim();
+  const pagePaths = parseComicPagePaths(form.elements.namedItem('page-paths').value);
+  const pathError = validateComicPaths(coverPath, pagePaths);
+  if (!title || title.length > 120 || description.length > 1000 || pathError) {
+    setStatus(status, pathError || 'Enter a chapter title and a description no longer than 1,000 characters.', true);
+    return;
+  }
+
+  button.disabled = true;
+  setStatus(status, 'Creating chapter...');
+  const chapterId = crypto.randomUUID();
+  let chapterSaved = false;
+  try {
+    const { data: latestSlots, error: slotsError } = await supabase.from('comic_chapter_slots')
+      .select('chapter_number')
+      .order('chapter_number', { ascending: false })
+      .limit(1);
+    if (slotsError) throw slotsError;
+    const chapterNumber = Number(latestSlots?.[0]?.chapter_number || 0) + 1;
+    const { error } = await supabase.from('comic_chapters').insert({
+      id: chapterId,
+      chapter_number: chapterNumber,
+      title,
+      description,
+      cover_path: coverPath || null,
+      page_paths: pagePaths,
+      created_by: currentUser.id,
+      updated_by: currentUser.id,
+    });
+    if (error) throw error;
+    chapterSaved = true;
+    form.reset();
+    setStatus(status, `Chapter ${chapterNumber} created.`);
+    toast(`Chapter ${chapterNumber} created.`, 'success');
+    try {
+      await loadAdminDashboard();
+    } catch (refreshError) {
+      console.error('Comic chapter was created but the editor could not refresh:', refreshError);
+      setStatus(status, `Chapter ${chapterNumber} was created. Refresh the admin portal to see it.`);
+    }
+  } catch (error) {
+    console.error('Comic chapter creation failed:', error);
+    setStatus(status, chapterSaved
+      ? 'The chapter was saved, but its editor could not refresh. Refresh the admin portal.'
+      : 'Could not create the chapter. Check your admin access and connection.', true);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function renderItems(items) {
@@ -469,8 +686,11 @@ async function loadAdminDashboard() {
       return;
     }
 
-    const [accessResult, feedbackResult, claimsResult, matchesResult, itemsResult, adminsResult, userMetricsResult] = await Promise.all([
+    const [accessResult, announcementResult, settingsResult, comicResult, feedbackResult, claimsResult, matchesResult, itemsResult, adminsResult, userMetricsResult] = await Promise.all([
     supabase.from('admin_access_requests').select('*').eq('status', 'pending').order('requested_at'),
+    supabase.from('announcement_requests').select('*').in('status', ['pending_review', 'awaiting_payment', 'payment_submitted']).order('created_at'),
+    supabase.from('announcement_payment_settings').select('*').eq('id', 'default').maybeSingle(),
+    supabase.from('comic_chapters').select('*').order('chapter_number'),
       supabase.from('user_feedback_reports').select('*').eq('status', 'pending').order('created_at'),
     supabase.from('claim_followup_requests').select('*').eq('status', 'pending').order('created_at'),
     supabase.from('owner_match_requests').select('*').eq('status', 'pending').order('created_at'),
@@ -483,22 +703,35 @@ async function loadAdminDashboard() {
     if (failure) throw failure;
 
   accessRequests = accessResult.data || [];
+  announcementRequests = announcementResult.error ? [] : announcementResult.data || [];
+  announcementPaymentSettings = settingsResult.data || null;
+  comicChapters = comicResult.error ? [] : comicResult.data || [];
+  const signedAnnouncementRequests = announcementResult.error ? [] : await signAnnouncementReceipts(announcementRequests);
+  if (!settingsResult.error) {
+    document.getElementById('announcement-gcash-instructions').value = settingsResult.data?.gcash_instructions || '';
+    document.getElementById('announcement-maribank-instructions').value = settingsResult.data?.maribank_instructions || '';
+  }
   claimRequests = await signPrivateEvidence(claimsResult.data || [], 'claim-evidence');
     userFeedbackRequests = feedbackResult.error ? [] : await signPrivateEvidence(feedbackResult.data || [], 'user-feedback-evidence');
   matchRequests = await signPrivateEvidence(matchesResult.data || [], 'claim-evidence');
   items = itemsResult.data || [];
   adminUsers = adminsResult.data || [];
   renderAccessRequests(accessRequests);
+  renderComicChapters(comicChapters, Boolean(comicResult.error));
+  renderAnnouncementRequests(signedAnnouncementRequests, Boolean(announcementResult.error));
     renderUserFeedbackRequests(userFeedbackRequests, Boolean(feedbackResult.error));
   renderClaimRequests(claimRequests);
   renderOwnerMatchRequests(matchRequests);
   renderItems(items);
   renderAdmins(adminUsers);
   updateAdminRoleUI();
-  renderOverview(items, accessRequests, userFeedbackRequests, claimRequests, matchRequests);
+  renderOverview(items, accessRequests, announcementRequests, userFeedbackRequests, claimRequests, matchRequests);
   renderAccountMetrics(userMetricsResult.error ? null : userMetricsResult.data);
   if (userMetricsResult.error) console.warn('Admin user metrics are unavailable. Apply the user activity metrics migration.');
   document.getElementById('nav-access-count').textContent = accessRequests.length;
+  document.getElementById('nav-announcement-count').textContent = announcementResult.error ? '—' : announcementRequests.length;
+  setStatus(document.getElementById('admin-announcement-status'), announcementResult.error || settingsResult.error ? 'Apply the paid announcements migration to enable this workflow.' : '');
+  setStatus(document.getElementById('admin-comic-status'), comicResult.error ? 'Apply the comic chapter editor migration to enable this editor.' : '');
     document.getElementById('nav-feedback-count').textContent = feedbackResult.error ? '—' : userFeedbackRequests.length;
     setStatus(document.getElementById('admin-feedback-status'), feedbackResult.error ? 'Apply the user feedback reports migration to enable this queue.' : '');
   document.getElementById('nav-claim-count').textContent = claimRequests.length;
@@ -668,6 +901,211 @@ document.getElementById('admin-calendar-grid').addEventListener('click', event =
   renderCalendar();
 });
 
+document.getElementById('comic-chapter-create-form').addEventListener('submit', createComicChapter);
+
+document.getElementById('admin-comic-chapter-list').addEventListener('submit', async event => {
+  const form = event.target.closest('.admin-comic-edit-form');
+  if (!form || !currentUser || !supabase) return;
+  event.preventDefault();
+
+  const chapter = comicChapters.find(entry => entry.id === form.dataset.comicId);
+  if (!chapter) return;
+  const status = form.querySelector('[role="status"]');
+  const button = form.querySelector('button[type="submit"]');
+  const title = form.elements.namedItem('title').value.trim();
+  const description = form.elements.namedItem('description').value.trim();
+  const coverPath = form.elements.namedItem('cover-path').value.trim();
+  const pagePaths = parseComicPagePaths(form.elements.namedItem('page-paths').value);
+  const pathError = validateComicPaths(coverPath, pagePaths);
+
+  if (!title || title.length > 120 || description.length > 1000 || pathError) {
+    setStatus(status, pathError || 'Enter a chapter title and a description no longer than 1,000 characters.', true);
+    return;
+  }
+
+  button.disabled = true;
+  setStatus(status, 'Saving chapter...');
+  let chapterSaved = false;
+  try {
+    const { data, error } = await supabase.from('comic_chapters').update({
+      title,
+      description,
+      cover_path: coverPath || null,
+      page_paths: pagePaths,
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString(),
+    }).eq('id', chapter.id).select('id').maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Chapter was not found or admin access was denied.');
+    chapterSaved = true;
+    toast(`Chapter ${chapter.chapter_number} updated.`, 'success');
+    try {
+      await loadAdminDashboard();
+    } catch (refreshError) {
+      console.error('Comic chapter was updated but the editor could not refresh:', refreshError);
+      setStatus(status, `Chapter ${chapter.chapter_number} was updated. Refresh the admin portal to see it.`);
+    }
+  } catch (error) {
+    console.error('Comic chapter update failed:', error);
+    setStatus(status, chapterSaved
+      ? `Chapter ${chapter.chapter_number} was saved. Refresh the admin portal to see the latest data.`
+      : 'Could not save this chapter. Check your admin access and connection.', true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById('admin-comic-chapter-list').addEventListener('click', async event => {
+  const button = event.target.closest('[data-comic-archive]');
+  if (!button || !currentUser || !supabase) return;
+  const chapter = comicChapters.find(entry => entry.id === button.dataset.comicArchive);
+  if (!chapter) return;
+
+  const willArchive = button.dataset.archiveState !== 'true';
+  const prompt = willArchive
+    ? `Archive Chapter ${chapter.chapter_number}? It will be hidden from My Journey, but its number and user progress will be preserved.`
+    : `Restore Chapter ${chapter.chapter_number} to My Journey?`;
+  if (!window.confirm(prompt)) return;
+
+  button.disabled = true;
+  let updated = false;
+  try {
+    const { error } = await supabase.from('comic_chapters').update({
+      is_archived: willArchive,
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString(),
+    }).eq('id', chapter.id);
+    if (error) throw error;
+    updated = true;
+    toast(willArchive ? 'Chapter archived; its number and progress are preserved.' : 'Chapter restored.', 'success');
+    try {
+      await loadAdminDashboard();
+    } catch (refreshError) {
+      console.error('Comic chapter archive state was changed but the editor could not refresh:', refreshError);
+      toast('Chapter state changed. Refresh the admin portal to see the update.', 'error');
+    }
+  } catch (error) {
+    console.error('Comic chapter archive update failed:', error);
+    toast(updated ? 'Chapter state changed. Refresh the admin portal to see the update.' : 'Could not update this chapter. Refresh and try again.', 'error');
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById('announcement-payment-settings-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!currentUser || !supabase) return;
+
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const status = document.getElementById('announcement-payment-settings-status');
+  button.disabled = true;
+  setStatus(status, 'Saving payment details...');
+  try {
+    const { data, error } = await supabase.from('announcement_payment_settings').update({
+      gcash_instructions: document.getElementById('announcement-gcash-instructions').value.trim(),
+      maribank_instructions: document.getElementById('announcement-maribank-instructions').value.trim(),
+      updated_at: new Date().toISOString(),
+      updated_by: currentUser.id,
+    }).eq('id', 'default').select('id').maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Payment settings row is unavailable.');
+    announcementPaymentSettings = {
+      gcash_instructions: document.getElementById('announcement-gcash-instructions').value.trim(),
+      maribank_instructions: document.getElementById('announcement-maribank-instructions').value.trim(),
+    };
+    setStatus(status, 'Payment details saved.');
+    toast('Announcement payment details saved.', 'success');
+  } catch (error) {
+    console.error('Announcement payment details could not be saved:', error);
+    setStatus(status, 'Could not save payment details. Check your connection and admin access.', true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById('admin-announcement-list').addEventListener('click', async event => {
+  const button = event.target.closest('[data-announcement-action]');
+  if (!button || !currentUser || !supabase) return;
+
+  const requestId = button.dataset.announcementId;
+  const request = announcementRequests.find(entry => entry.id === requestId);
+  if (!request) return;
+
+  const container = document.getElementById('admin-announcement-list');
+  const action = button.dataset.announcementAction;
+  button.disabled = true;
+
+  try {
+    if (action === 'approve-text' || action === 'reject-text') {
+      const note = Array.from(container.querySelectorAll('[data-announcement-note]'))
+        .find(field => field.dataset.announcementNote === requestId)?.value.trim() || '';
+      const approvedTitle = Array.from(container.querySelectorAll('[data-announcement-title]'))
+        .find(field => field.dataset.announcementTitle === requestId)?.value.trim() || '';
+      const approvedMessage = Array.from(container.querySelectorAll('[data-announcement-message]'))
+        .find(field => field.dataset.announcementMessage === requestId)?.value.trim() || '';
+      const hours = Number(request.requested_duration_hours);
+      const approve = action === 'approve-text';
+      if (!approve && note.length < 3) {
+        toast('Add a short explanation before rejecting the announcement.', 'error');
+        return;
+      }
+      if (approve && !announcementPaymentSettings?.gcash_instructions?.trim() && !announcementPaymentSettings?.maribank_instructions?.trim()) {
+        toast('Configure at least one payment method before approving announcement text.', 'error');
+        return;
+      }
+      if (approve && (!approvedTitle || approvedTitle.length > 100 || !approvedMessage || approvedMessage.length > 500 || !Number.isInteger(hours) || hours < 1 || hours > 5)) {
+        toast('Enter valid approved text and verify the requested duration is from 1 to 5 hours.', 'error');
+        return;
+      }
+
+      const { error } = await supabase.rpc('review_announcement_request', {
+        p_request_id: requestId,
+        p_approve: approve,
+        p_approved_title: approve ? approvedTitle : null,
+        p_approved_message: approve ? approvedMessage : null,
+        p_duration_hours: approve ? hours : null,
+        p_note: note || null,
+      });
+      if (error) throw error;
+      toast(approve ? 'Text approved. The user can now pay.' : 'Announcement text rejected.', 'success');
+    } else if (action === 'verify-payment') {
+      if (!request.payment_proof_path || !request.payment_method) {
+        toast('A payment receipt and method are required before verification.', 'error');
+        return;
+      }
+      const { error } = await supabase.rpc('verify_announcement_payment', { p_request_id: requestId });
+      if (error) throw error;
+      toast('Payment verified and announcement published.', 'success');
+    } else if (action === 'reject-payment') {
+      const note = Array.from(container.querySelectorAll('[data-announcement-note]'))
+        .find(field => field.dataset.announcementNote === requestId)?.value.trim() || '';
+      if (note.length < 3) {
+        toast('Explain why the user needs to submit a new receipt.', 'error');
+        return;
+      }
+      const { error } = await supabase.rpc('reject_announcement_payment', {
+        p_request_id: requestId,
+        p_note: note,
+      });
+      if (error) throw error;
+      if (request.payment_proof_path) {
+        const { error: removeError } = await supabase.storage.from('announcement-payment-evidence').remove([request.payment_proof_path]);
+        if (removeError) console.error('Rejected announcement receipt could not be removed:', removeError);
+      }
+      toast('Receipt returned for resubmission.', 'success');
+    } else {
+      return;
+    }
+    await loadAdminDashboard();
+  } catch (error) {
+    console.error('Announcement review action failed:', error);
+    toast('Could not update this announcement request. Refresh and try again.', 'error');
+  } finally {
+    button.disabled = false;
+  }
+});
+
 document.getElementById('admin-profile-form').addEventListener('submit', async event => {
   event.preventDefault();
   if (!currentUser) return;
@@ -701,6 +1139,8 @@ document.querySelectorAll('[data-admin-signout]').forEach(button => {
     currentUserRole = '';
     updateAdminRoleUI();
     accessRequests = [];
+    announcementRequests = [];
+    comicChapters = [];
     claimRequests = [];
     matchRequests = [];
     items = [];

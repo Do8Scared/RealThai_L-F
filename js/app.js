@@ -27,6 +27,8 @@ import { COMIC_CHAPTERS } from './comic-chapters.js';
 const state = {
   items: [],
   handoffs: [],
+  comicChapters: COMIC_CHAPTERS,
+  comicChapterMaxNumber: COMIC_CHAPTERS.length,
   activeType: '',
   userEmail: '',
   userId: '',
@@ -111,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.userId = session.user.id;
                 unlockAppShell(email);
                 void fetchAndSyncItems();
+                void loadAnnouncements();
             } else {
                 state.userId = '';
                 state.handoffs = [];
@@ -178,11 +181,15 @@ function initAppNavigation() {
                 if (targetSec === 'journey') {
                     void loadMyJourney();
                 }
+                if (targetSec === 'announcements') {
+                    void loadAnnouncements();
+                }
             } else {
                 console.warn(`Target section element for "${targetSec}" not found in DOM.`);
             }
         });
     });
+    document.getElementById('my-announcement-requests')?.addEventListener('submit', handleAnnouncementPaymentSubmit);
 }
 
 function initFilterListeners() {
@@ -383,6 +390,296 @@ window.submitReport = async () => {
 // ==========================================
 // MY REPORTS & STATUS MANAGEMENT
 // ==========================================
+
+const ANNOUNCEMENT_PAYMENT_BUCKET = 'announcement-payment-evidence';
+let announcementExpiryTimeout = null;
+let announcementRefreshInterval = null;
+let userAnnouncementRequests = [];
+let userAnnouncementPaymentSettings = null;
+
+function formatAnnouncementAmount(amount) {
+    return `PHP ${Number(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+function renderAnnouncementBanner(announcement) {
+    const banner = document.getElementById('announcement-banner');
+    if (!banner) return;
+    clearTimeout(announcementExpiryTimeout);
+    if (!announcement?.length) {
+        banner.style.display = 'none';
+        return;
+    }
+
+    banner.innerHTML = `<div class="announcement-tag">Announcement</div>${announcement.map(item => `
+      <div class="announcement-copy"><strong>${x(item.approved_title)}</strong> ${x(item.approved_message)}</div>
+    `).join('')}`;
+    banner.style.display = '';
+    const nextExpiry = Math.min(...announcement.map(item => new Date(item.expires_at).getTime()));
+    if (Number.isFinite(nextExpiry)) {
+        announcementExpiryTimeout = setTimeout(() => { void loadAnnouncements(); }, Math.max(0, nextExpiry - Date.now() + 50));
+    }
+}
+
+function getAnnouncementStatusLabel(status) {
+    return ({
+        pending_review: 'Waiting for content review',
+        awaiting_payment: 'Approved · payment needed',
+        payment_submitted: 'Payment proof submitted · under review',
+        published: 'Published',
+        rejected: 'Not approved',
+    })[status] || 'Status unavailable';
+}
+
+function hasActiveAnnouncementRequest(requests) {
+    return requests.some(request => ['pending_review', 'awaiting_payment', 'payment_submitted'].includes(request.status));
+}
+
+function renderAnnouncementPaymentInstruction(value) {
+    const details = value.trim();
+    try {
+        const url = new URL(details);
+        if (url.protocol === 'https:') {
+            return `<a class="announcement-payment-link" href="${x(url.href)}" target="_blank" rel="noopener noreferrer">Open secure payment / QR link</a>`;
+        }
+    } catch {
+        return x(details);
+    }
+    return x(details);
+}
+
+function renderAnnouncementRequests(requests, settings) {
+    const container = document.getElementById('my-announcement-requests');
+    if (!container) return;
+    userAnnouncementRequests = requests;
+    userAnnouncementPaymentSettings = settings;
+    const activeRequest = requests.find(request => ['pending_review', 'awaiting_payment', 'payment_submitted'].includes(request.status));
+    const requestForm = document.getElementById('announcement-request-form');
+    const submitButton = requestForm?.querySelector('button[type="submit"]');
+    const status = document.getElementById('announcement-request-status');
+    if (submitButton) {
+        submitButton.disabled = Boolean(activeRequest);
+        submitButton.textContent = activeRequest ? 'Request in progress' : 'Submit for review';
+    }
+    if (status && activeRequest) {
+        status.textContent = activeRequest.status === 'awaiting_payment'
+            ? 'Your approved request is awaiting payment.'
+            : activeRequest.status === 'payment_submitted'
+                ? 'Your receipt is awaiting verification.'
+                : 'Your announcement request is under review.';
+    }
+    if (!requests.length) {
+        container.innerHTML = '<p class="announcement-request-empty">You have not submitted an announcement yet.</p>';
+        return;
+    }
+
+    const instructions = {
+        gcash: settings?.gcash_instructions || '',
+        maribank: settings?.maribank_instructions || '',
+    };
+
+    container.innerHTML = requests.map(request => {
+        const title = request.approved_title || request.title;
+        const message = request.approved_message || request.message;
+        const availablePaymentMethods = Object.entries(instructions).filter(([, details]) => details.trim());
+        const paymentDetails = availablePaymentMethods.map(([method, details]) => `
+            <p><b>${method === 'gcash' ? 'GCash' : 'MariBank'}:</b> ${renderAnnouncementPaymentInstruction(details)}</p>
+        `).join('');
+        const paymentInstructions = request.status === 'awaiting_payment'
+            ? `<div class="announcement-payment-details">
+                <strong>Payment details</strong>
+                ${paymentDetails || '<p>Payment details are not configured yet. Please check back before paying.</p>'}
+              </div>`
+            : '';
+        const paymentForm = request.status === 'awaiting_payment' && availablePaymentMethods.length
+            ? `<form class="announcement-payment-form" data-payment-request="${x(request.id)}">
+                <label>Upload payment receipt
+                  <input name="payment-proof" type="file" accept="image/jpeg,image/png,image/webp" required />
+                </label>
+                <label>Paid using
+                  <select name="payment-method" required>
+                    <option value="">Choose payment method</option>
+                    ${availablePaymentMethods.map(([method]) => `<option value="${x(method)}">${method === 'gcash' ? 'GCash' : 'MariBank'}</option>`).join('')}
+                  </select>
+                </label>
+                <button class="btn btn-primary btn-sm" type="submit">Send receipt for verification</button>
+              </form>`
+            : '';
+        const shownHours = request.duration_hours || request.requested_duration_hours;
+        const shownAmount = request.amount_due || shownHours * 10;
+        const durationAndPrice = shownHours
+            ? `<p class="announcement-request-price">${shownHours} hour${shownHours === 1 ? '' : 's'} · ${formatAnnouncementAmount(shownAmount)}</p>`
+            : '';
+        const expiry = request.status === 'published' && request.expires_at
+            ? `<p>Shown until ${x(new Date(request.expires_at).toLocaleString('en-PH'))}</p>`
+            : '';
+        const note = request.admin_note ? `<p class="announcement-admin-note"><strong>Admin note:</strong> ${x(request.admin_note)}</p>` : '';
+        const displayStatus = request.status === 'published' && new Date(request.expires_at).getTime() <= Date.now()
+            ? 'expired'
+            : request.status;
+
+        return `<article class="announcement-request-card">
+          <div class="announcement-request-card-head">
+            <span class="announcement-request-status announcement-request-status--${x(request.status)}">${x(displayStatus === 'expired' ? 'Expired' : getAnnouncementStatusLabel(displayStatus))}</span>
+            <time>${x(new Date(request.created_at).toLocaleString('en-PH'))}</time>
+          </div>
+          <h3>${x(title)}</h3>
+          <p class="announcement-request-copy">${x(message)}</p>
+          ${durationAndPrice}${note}${paymentInstructions}${paymentForm}${expiry}
+        </article>`;
+    }).join('');
+}
+
+async function loadAnnouncements() {
+    if (!supabase || !state.userId) return;
+
+    const [activeResult, requestsResult, settingsResult] = await Promise.all([
+        supabase.from('active_announcements')
+            .select('approved_title,approved_message,published_at,expires_at')
+            .order('published_at', { ascending: false }),
+        supabase.from('announcement_requests')
+            .select('*')
+            .eq('user_id', state.userId)
+            .order('created_at', { ascending: false }),
+        supabase.from('announcement_payment_settings')
+            .select('gcash_instructions,maribank_instructions')
+            .eq('id', 'default')
+            .maybeSingle(),
+    ]);
+
+    const failure = activeResult.error || requestsResult.error || settingsResult.error;
+    if (failure) {
+        console.error('Announcement data could not be loaded:', failure);
+        const status = document.getElementById('announcement-request-status');
+        if (status) status.textContent = 'Announcement services are unavailable. The admin may need to apply the announcement migration.';
+        if (document.getElementById('sec-announcements')?.classList.contains('active')) {
+            toast('Could not load announcements. Please refresh and try again.', 'error');
+        }
+        return;
+    }
+
+    const activeAnnouncements = activeResult.data || [];
+    const requests = requestsResult.data || [];
+    const settings = settingsResult.data || null;
+    renderAnnouncementBanner(activeAnnouncements);
+    renderAnnouncementRequests(requests, settings);
+}
+
+async function refreshActiveAnnouncements() {
+    if (!supabase || !state.userId) return;
+    const { data, error } = await supabase.from('active_announcements')
+        .select('approved_title,approved_message,published_at,expires_at')
+        .order('published_at', { ascending: false });
+    if (error) {
+        console.error('Active announcements could not be refreshed:', error);
+        return;
+    }
+    renderAnnouncementBanner(data || []);
+}
+
+window.submitAnnouncementRequest = async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const submitButton = form.querySelector('button[type="submit"]');
+    const status = document.getElementById('announcement-request-status');
+    if (submitButton.disabled) return;
+    if (!supabase || !state.userId) {
+        toast('Sign in again before submitting an announcement.', 'error');
+        return;
+    }
+    if (hasActiveAnnouncementRequest(userAnnouncementRequests)) {
+        if (status) status.textContent = 'You already have an announcement request in progress.';
+        return;
+    }
+
+    const title = document.getElementById('announcement-request-title')?.value.trim() || '';
+    const message = document.getElementById('announcement-request-message')?.value.trim() || '';
+    const durationHours = Number(document.getElementById('announcement-request-duration')?.value);
+    if (!title || title.length > 100 || !message || message.length > 500 || !Number.isInteger(durationHours) || durationHours < 1 || durationHours > 5) {
+        if (status) status.textContent = 'Enter a valid headline and announcement text, and choose a duration from 1 to 5 hours.';
+        return;
+    }
+
+    submitButton.disabled = true;
+    if (status) status.textContent = 'Submitting for review...';
+
+    try {
+        const { data, error } = await supabase.from('announcement_requests').insert({
+            user_id: state.userId,
+            email: state.userEmail,
+            title,
+            message,
+            requested_duration_hours: durationHours,
+        }).select('*').single();
+        if (error) throw error;
+        form.reset();
+        userAnnouncementRequests = [data, ...userAnnouncementRequests];
+        renderAnnouncementRequests(userAnnouncementRequests, userAnnouncementPaymentSettings);
+        if (status) status.textContent = 'Your request was submitted and added below. It is waiting for admin review.';
+        toast('Announcement submitted for review.', 'success');
+    } catch (error) {
+        console.error('Announcement request submission failed:', error);
+        const message = typeof error?.message === 'string' ? error.message : String(error);
+        const errorCode = error?.code ? ` (${error.code})` : '';
+        if (status) {
+            status.textContent = `Could not submit your announcement${errorCode}: ${message.slice(0, 220)}`;
+        }
+    } finally {
+        submitButton.disabled = hasActiveAnnouncementRequest(userAnnouncementRequests);
+    }
+};
+
+async function handleAnnouncementPaymentSubmit(event) {
+    const form = event.target.closest('form[data-payment-request]');
+    if (!form) return;
+    event.preventDefault();
+    if (!supabase || !state.userId) {
+        toast('Sign in again before submitting payment proof.', 'error');
+        return;
+    }
+
+    const file = form.elements.namedItem('payment-proof')?.files?.[0] || null;
+    const method = form.elements.namedItem('payment-method')?.value || '';
+    if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+        toast('Upload a JPEG, PNG, or WebP receipt no larger than 5 MB.', 'error');
+        return;
+    }
+    if (!['gcash', 'maribank'].includes(method)) {
+        toast('Choose GCash or MariBank as the payment method.', 'error');
+        return;
+    }
+
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    const extension = file.type.split('/')[1];
+    const proofPath = `${state.userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from(ANNOUNCEMENT_PAYMENT_BUCKET).upload(proofPath, file, {
+        contentType: file.type,
+        upsert: false,
+    });
+    if (uploadError) {
+        button.disabled = false;
+        console.error('Announcement payment receipt upload failed:', uploadError);
+        toast('Could not upload the receipt. Please try again.', 'error');
+        return;
+    }
+
+    const { error } = await supabase.rpc('submit_announcement_payment', {
+        p_request_id: form.dataset.paymentRequest,
+        p_payment_method: method,
+        p_proof_path: proofPath,
+    });
+    if (error) {
+        const { error: cleanupError } = await supabase.storage.from(ANNOUNCEMENT_PAYMENT_BUCKET).remove([proofPath]);
+        if (cleanupError) console.error('Could not remove an unused announcement receipt:', cleanupError);
+        button.disabled = false;
+        console.error('Announcement payment submission failed:', error);
+        toast('Could not submit payment proof. Please refresh and try again.', 'error');
+        return;
+    }
+
+    toast('Payment proof sent to admin for verification.', 'success');
+    await loadAnnouncements();
+}
 
 function renderMyReports(state) {
     const grid = document.getElementById('my-reports-grid');
@@ -705,6 +1002,8 @@ async function loadMyJourney() {
    if (!transactionList) return;
    if (!supabase || !state.userId) {
        state.handoffs = [];
+       state.comicChapters = COMIC_CHAPTERS;
+       state.comicChapterMaxNumber = COMIC_CHAPTERS.length;
        renderMyJourney();
        transactionList.innerHTML = '<p class="journey-empty">Sign in to view your journey.</p>';
        return;
@@ -715,20 +1014,52 @@ async function loadMyJourney() {
    transactionList.innerHTML = '<p class="journey-empty">Loading handoff activity…</p>';
    const requestedUserId = state.userId;
    try {
-       const { data, error } = await supabase
+       const [chapterResult, chapterSlotsResult, handoffResult] = await Promise.all([
+           supabase.from('comic_chapters')
+               .select('chapter_number,title,description,cover_path,page_paths')
+               .eq('is_archived', false)
+               .order('chapter_number'),
+           supabase.from('comic_chapter_slots')
+               .select('chapter_number')
+               .order('chapter_number', { ascending: false })
+               .limit(1)
+               .maybeSingle(),
+           supabase
            .from('handoff_transactions')
            .select('id, item_id, initiator_id, partner_id, status, created_at, completed_at')
-           .order('created_at', { ascending: false });
-       if (error) {
+           .order('created_at', { ascending: false }),
+       ]);
+       if (chapterResult.error) {
+           console.warn('Comic chapters could not be loaded; using the built-in chapter list:', chapterResult.error);
+           state.comicChapters = COMIC_CHAPTERS;
+       } else {
+           state.comicChapters = (chapterResult.data || []).map(chapter => ({
+               number: chapter.chapter_number,
+               title: chapter.title,
+               description: chapter.description || '',
+               cover: chapter.cover_path ? `./${chapter.cover_path}` : '',
+               pages: (chapter.page_paths || []).map(path => `./${path}`),
+           }));
+       }
+       if (chapterSlotsResult.error) {
+           console.warn('Chapter numbering history could not be loaded:', chapterSlotsResult.error);
+           state.comicChapterMaxNumber = Math.max(
+               COMIC_CHAPTERS.length,
+               ...state.comicChapters.map(chapter => chapter.number),
+           );
+       } else {
+           state.comicChapterMaxNumber = chapterSlotsResult.data?.chapter_number || 0;
+       }
+       if (handoffResult.error) {
            if (state.userId !== requestedUserId) return;
-           console.error('Handoff history load failed:', error);
+           console.error('Handoff history load failed:', handoffResult.error);
            transactionList.innerHTML = '<p class="journey-empty journey-error">Could not load handoff activity. Please try again later.</p>';
            toast('Could not load your reward progress.', 'error');
            return;
        }
 
        if (state.userId !== requestedUserId) return;
-       state.handoffs = data || [];
+       state.handoffs = handoffResult.data || [];
        renderMyJourney();
    } catch (error) {
        if (state.userId !== requestedUserId) return;
@@ -742,8 +1073,7 @@ function renderMyJourney() {
    const completedCount = state.handoffs.filter(transaction => transaction.status === 'completed').length;
    const rankIndex = Math.min(completedCount, JOURNEY_RANKS.length - 1);
    const theme = document.body.dataset.theme === 'light' ? 'light' : 'dark';
-   const nextChapterNumber = completedCount + 1;
-   const nextChapter = getComicChapter(nextChapterNumber);
+   const nextChapter = state.comicChapters.find(chapter => chapter.number > completedCount);
    const rank = document.getElementById('journey-rank');
    const reunionCount = document.getElementById('journey-reunion-count');
    const chapterCount = document.getElementById('journey-chapter-count');
@@ -758,7 +1088,11 @@ function renderMyJourney() {
    if (reunionCount) reunionCount.textContent = completedCount;
    if (chapterCount) chapterCount.textContent = completedCount;
    if (nextRank) {
-       nextRank.textContent = `Confirm a successful handoff to unlock ${nextChapter.title}.`;
+       nextRank.textContent = nextChapter
+           ? nextChapter.number === completedCount + 1
+               ? `Confirm a successful handoff to unlock ${nextChapter.title}.`
+               : `${nextChapter.title} unlocks after ${nextChapter.number} confirmed handoffs.`
+           : `Complete a confirmed handoff to unlock Chapter ${Math.max(state.comicChapterMaxNumber, completedCount) + 1}.`;
    }
 
    renderJourneyBadges(completedCount);
@@ -786,8 +1120,13 @@ function renderJourneyBadges(completedCount) {
 function renderJourneyChapters(unlockedCount) {
    const container = document.getElementById('journey-chapters');
    if (!container) return;
-   const totalChaptersToShow = Math.max(COMIC_CHAPTERS.length, unlockedCount + 1);
-   const chaptersToShow = Array.from({ length: totalChaptersToShow }, (_, index) => getComicChapter(index + 1));
+   const chaptersByNumber = new Map(state.comicChapters.map(chapter => [chapter.number, chapter]));
+   const latestChapterNumber = state.comicChapterMaxNumber;
+   const totalChaptersToShow = Math.max(latestChapterNumber, unlockedCount + 1);
+   const chaptersToShow = Array.from({ length: totalChaptersToShow }, (_, index) => {
+       const number = index + 1;
+       return chaptersByNumber.get(number) || (number > latestChapterNumber ? getComicChapter(number) : null);
+   }).filter(Boolean);
    container.innerHTML = chaptersToShow.map(chapter => {
        const unlocked = chapter.number <= unlockedCount;
        const cover = unlocked && chapter.cover
@@ -811,6 +1150,7 @@ function renderJourneyChapters(unlockedCount) {
                <div class="journey-chapter-info">
                    <span class="journey-chapter-kicker">${unlocked ? 'Unlocked' : `Unlock after handoff ${chapter.number}`}</span>
                    <h3>${x(chapter.title)}</h3>
+                   ${unlocked && chapter.description ? `<p>${x(chapter.description)}</p>` : ''}
                    ${unlocked ? pages : '<p>Complete one more confirmed handoff to read this chapter.</p>'}
                </div>
            </article>`;
@@ -818,7 +1158,7 @@ function renderJourneyChapters(unlockedCount) {
 }
 
 function getComicChapter(number) {
-   return COMIC_CHAPTERS.find(chapter => chapter.number === number) || {
+   return state.comicChapters.find(chapter => chapter.number === number) || {
        number,
        title: `Chapter ${number}`,
        cover: '',
@@ -1162,6 +1502,7 @@ async function checkAuthGate() {
             state.userId = session.user.id;
             unlockAppShell(email);
             void fetchAndSyncItems();
+            void loadAnnouncements();
         } else {
             state.userId = '';
             lockAppShell();
@@ -1179,11 +1520,17 @@ function unlockAppShell(email) {
     const shell = document.getElementById('app-shell');
     if (gate) gate.style.display = 'none';
     if (shell) shell.style.display = '';
+    if (!announcementRefreshInterval) {
+        announcementRefreshInterval = window.setInterval(() => { void refreshActiveAnnouncements(); }, 60_000);
+    }
 }
 
 function lockAppShell() {
     state.userEmail = '';
     state.userId = '';
+    renderAnnouncementBanner(null);
+    clearInterval(announcementRefreshInterval);
+    announcementRefreshInterval = null;
     const gate = document.getElementById('auth-gate');
     const shell = document.getElementById('app-shell');
     if (gate) gate.style.display = 'flex';

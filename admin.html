@@ -76,8 +76,11 @@
           <button class="admin-nav-item active" type="button" data-admin-view="overview">Dashboard</button>
           <button class="admin-nav-item" type="button" data-admin-view="users">User management</button>
           <button class="admin-nav-item" type="button" data-admin-view="calendar">Calendar</button>
+          <p class="admin-nav-label">Content</p>
+          <button class="admin-nav-item" type="button" data-admin-view="comics">Comic chapters</button>
           <p class="admin-nav-label">Review queues</p>
           <button class="admin-nav-item" type="button" data-admin-view="access">Admin access <span id="nav-access-count">0</span></button>
+          <button class="admin-nav-item" type="button" data-admin-view="announcements">Announcements <span id="nav-announcement-count">0</span></button>
           <button class="admin-nav-item" type="button" data-admin-view="feedback">User feedback <span id="nav-feedback-count">0</span></button>
           <button class="admin-nav-item" type="button" data-admin-view="claims">Claim follow-ups <span id="nav-claim-count">0</span></button>
           <button class="admin-nav-item" type="button" data-admin-view="matches">Owner matches <span id="nav-match-count">0</span></button>
@@ -158,6 +161,50 @@
             <div class="admin-view-heading"><div><p class="admin-eyebrow">Review queue</p><h2 id="feedback-heading">User feedback</h2><p class="admin-view-intro">Website and announcement reports submitted from the user portal.</p></div><span id="admin-feedback-count" class="admin-count">0</span></div>
             <p id="admin-feedback-status" class="admin-status" role="status" aria-live="polite"></p>
             <div id="admin-feedback-list" class="admin-list"></div>
+          </section>
+
+          <section class="admin-view" data-admin-panel="announcements" aria-labelledby="announcement-admin-heading" hidden>
+            <div class="admin-view-heading"><div><p class="admin-eyebrow">Paid promotion</p><h2 id="announcement-admin-heading">Announcement requests</h2><p class="admin-view-intro">Review submitted text first. Users pay only after approval; publish only after verifying the receipt.</p></div><span id="admin-announcement-count" class="admin-count">0</span></div>
+            <form id="announcement-payment-settings-form" class="admin-section admin-announcement-settings">
+              <div>
+                <h3>Payment instructions</h3>
+                <p>These fixed details are shown to users after their announcement text is approved. Include the recipient name and account number, or a secure QR link.</p>
+              </div>
+              <label for="announcement-gcash-instructions">GCash details</label>
+              <textarea id="announcement-gcash-instructions" rows="2" maxlength="1000" placeholder="Recipient name and number, or QR link"></textarea>
+              <label for="announcement-maribank-instructions">MariBank details</label>
+              <textarea id="announcement-maribank-instructions" rows="2" maxlength="1000" placeholder="Recipient name and account details, or QR link"></textarea>
+              <div class="admin-announcement-settings-actions"><p id="announcement-payment-settings-status" class="admin-status" role="status" aria-live="polite"></p><button class="btn btn-primary" type="submit">Save payment details</button></div>
+            </form>
+            <p id="admin-announcement-status" class="admin-status" role="status" aria-live="polite"></p>
+            <div id="admin-announcement-list" class="admin-list"></div>
+          </section>
+
+          <section class="admin-view" data-admin-panel="comics" aria-labelledby="comic-editor-heading" hidden>
+            <div class="admin-view-heading">
+              <div>
+                <p class="admin-eyebrow">My Journey rewards</p>
+                <h2 id="comic-editor-heading">Comic chapter editor</h2>
+                <p class="admin-view-intro">Create chapters, edit their details and local artwork paths, or archive chapters while preserving users' progress.</p>
+              </div>
+              <span id="admin-comic-count" class="admin-count">0</span>
+            </div>
+            <section class="admin-section admin-comic-create" aria-labelledby="comic-create-heading">
+              <div>
+                <h3 id="comic-create-heading">Create a chapter</h3>
+                <p>New chapters get the next number. Chapters unlock in number order after confirmed handoffs.</p>
+              </div>
+              <form id="comic-chapter-create-form" class="admin-comic-form">
+                <label>Chapter title<input name="title" type="text" maxlength="120" required /></label>
+                <label>Story description <span class="admin-optional">(optional)</span><textarea name="description" rows="2" maxlength="1000"></textarea></label>
+                <label>Cover image path <span class="admin-optional">(optional)</span><input name="cover-path" type="text" placeholder="assets/comics/chapter-01/cover.webp" /></label>
+                <label>Page image paths <span class="admin-optional">(one local path per line, in reading order)</span><textarea name="page-paths" rows="4" placeholder="assets/comics/chapter-01/page-01.webp&#10;assets/comics/chapter-01/page-02.webp"></textarea></label>
+                <p class="admin-comic-file-hint">Add the artwork files to the repository under <code>assets/comics/</code>. Supported in-browser image formats include JPEG, PNG, WebP, GIF, and AVIF. Local file paths are committed and deployed with the app; the editor does not upload image files.</p>
+                <div class="admin-comic-form-actions"><p id="comic-chapter-create-status" class="admin-status" role="status" aria-live="polite"></p><button class="btn btn-primary" type="submit">Create chapter</button></div>
+              </form>
+            </section>
+            <p id="admin-comic-status" class="admin-status" role="status" aria-live="polite"></p>
+            <div id="admin-comic-chapter-list" class="admin-comic-chapter-list"></div>
           </section>
 
           <section class="admin-view" data-admin-panel="claims" aria-labelledby="claim-heading" hidden>
