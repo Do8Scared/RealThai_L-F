@@ -567,7 +567,7 @@ function renderComicChapters(chapters, unavailable = false) {
     const pageUrls = (chapter.page_paths || []).map(getComicArtworkUrl);
     return `<article class="admin-section admin-comic-chapter${chapter.is_archived ? ' is-archived' : ''}">
       <div class="admin-comic-chapter-header">
-        <div><span class="admin-comic-chapter-number">Chapter ${chapter.chapter_number}</span><span class="admin-comic-chapter-state">${chapter.is_archived ? 'Archived' : 'Active'}</span></div>
+        <div><span class="admin-comic-chapter-number">${chapter.story_side === 'dark' ? 'Dark Side' : 'Light Side'} · Chapter ${chapter.chapter_number}</span><span class="admin-comic-chapter-state">${chapter.is_archived ? 'Archived' : 'Active'}</span></div>
         <div class="admin-comic-preview">
           ${coverUrl ? `<a href="${x(coverUrl)}" target="_blank" rel="noopener noreferrer"><img src="${x(coverUrl)}" alt="${x(chapter.title)} cover" loading="lazy"></a>` : '<span class="admin-comic-no-cover">No cover</span>'}
           ${pageUrls.slice(0, 5).map((url, index) => `<a href="${x(url)}" target="_blank" rel="noopener noreferrer"><img src="${x(url)}" alt="${x(chapter.title)} page ${index + 1}" loading="lazy"></a>`).join('')}
@@ -596,12 +596,13 @@ async function createComicChapter(event) {
   const form = event.currentTarget;
   const status = document.getElementById('comic-chapter-create-status');
   const button = form.querySelector('button[type="submit"]');
+  const storySide = form.elements.namedItem('story-side').value;
   const title = form.elements.namedItem('title').value.trim();
   const description = form.elements.namedItem('description').value.trim();
   const coverPath = form.elements.namedItem('cover-path').value.trim();
   const pagePaths = parseComicPagePaths(form.elements.namedItem('page-paths').value);
   const pathError = validateComicPaths(coverPath, pagePaths);
-  if (!title || title.length > 120 || description.length > 1000 || pathError) {
+  if (!['light', 'dark'].includes(storySide) || !title || title.length > 120 || description.length > 1000 || pathError) {
     setStatus(status, pathError || 'Enter a chapter title and a description no longer than 1,000 characters.', true);
     return;
   }
@@ -613,12 +614,14 @@ async function createComicChapter(event) {
   try {
     const { data: latestSlots, error: slotsError } = await supabase.from('comic_chapter_slots')
       .select('chapter_number')
+      .eq('story_side', storySide)
       .order('chapter_number', { ascending: false })
       .limit(1);
     if (slotsError) throw slotsError;
     const chapterNumber = Number(latestSlots?.[0]?.chapter_number || 0) + 1;
     const { error } = await supabase.from('comic_chapters').insert({
       id: chapterId,
+      story_side: storySide,
       chapter_number: chapterNumber,
       title,
       description,
@@ -630,13 +633,14 @@ async function createComicChapter(event) {
     if (error) throw error;
     chapterSaved = true;
     form.reset();
-    setStatus(status, `Chapter ${chapterNumber} created.`);
-    toast(`Chapter ${chapterNumber} created.`, 'success');
+    const sideLabel = storySide === 'dark' ? 'Dark Side' : 'Light Side';
+    setStatus(status, `${sideLabel} Chapter ${chapterNumber} created.`);
+    toast(`${sideLabel} Chapter ${chapterNumber} created.`, 'success');
     try {
       await loadAdminDashboard();
     } catch (refreshError) {
       console.error('Comic chapter was created but the editor could not refresh:', refreshError);
-      setStatus(status, `Chapter ${chapterNumber} was created. Refresh the admin portal to see it.`);
+      setStatus(status, `${sideLabel} Chapter ${chapterNumber} was created. Refresh the admin portal to see it.`);
     }
   } catch (error) {
     console.error('Comic chapter creation failed:', error);
@@ -752,7 +756,7 @@ async function loadAdminDashboard() {
     supabase.from('admin_access_requests').select('*').eq('status', 'pending').order('requested_at'),
     supabase.from('announcement_requests').select('*').in('status', ['pending_review', 'awaiting_payment', 'payment_submitted']).order('created_at'),
     supabase.from('announcement_payment_settings').select('*').eq('id', 'default').maybeSingle(),
-    supabase.from('comic_chapters').select('*').order('chapter_number'),
+    supabase.from('comic_chapters').select('*').order('story_side').order('chapter_number'),
       supabase.from('user_feedback_reports').select('*').eq('status', 'pending').order('created_at'),
     supabase.from('claim_followup_requests').select('*').eq('status', 'pending').order('created_at'),
     supabase.from('owner_match_requests').select('*').eq('status', 'pending').order('created_at'),

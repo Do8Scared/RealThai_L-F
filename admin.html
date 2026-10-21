@@ -185,16 +185,22 @@
               <div>
                 <p class="admin-eyebrow">My Journey rewards</p>
                 <h2 id="comic-editor-heading">Comic chapter editor</h2>
-                <p class="admin-view-intro">Create chapters, edit their details and local artwork paths, or archive chapters while preserving users' progress.</p>
+                <p class="admin-view-intro">Create separate Light Side and Dark Side storylines, edit chapter details and local artwork paths, or archive chapters while preserving users' progress.</p>
               </div>
               <span id="admin-comic-count" class="admin-count">0</span>
             </div>
             <section class="admin-section admin-comic-create" aria-labelledby="comic-create-heading">
               <div>
                 <h3 id="comic-create-heading">Create a chapter</h3>
-                <p>New chapters get the next number. Chapters unlock in number order after confirmed handoffs.</p>
+                <p>Each side has its own chapter sequence. Chapters unlock in number order after confirmed handoffs.</p>
               </div>
               <form id="comic-chapter-create-form" class="admin-comic-form">
+                <label>Storyline
+                  <select name="story-side" required>
+                    <option value="light">Light Side</option>
+                    <option value="dark">Dark Side</option>
+                  </select>
+                </label>
                 <label>Chapter title<input name="title" type="text" maxlength="120" required /></label>
                 <label>Story description <span class="admin-optional">(optional)</span><textarea name="description" rows="2" maxlength="1000"></textarea></label>
                 <label>Cover image path <span class="admin-optional">(optional)</span><input name="cover-path" type="text" placeholder="assets/comics/chapter-01/cover.webp" /></label>

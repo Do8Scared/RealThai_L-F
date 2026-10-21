@@ -70,6 +70,16 @@ body{
   font-size:14px; background:#fff; color:var(--ink);
 }
 .auth-field input:focus{outline:none;border-color:var(--maroon);box-shadow:0 0 0 3px rgba(139,26,26,.08)}
+.auth-story-choice{margin:16px 0 0;padding:0;border:0;min-width:0}
+.auth-story-choice legend{font-size:12px;font-weight:700;color:var(--ink-2)}
+.auth-story-choice>p{margin:5px 0 10px;font-size:11.5px;line-height:1.45;color:var(--ink-3)}
+.auth-story-options{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.auth-story-option{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1.5px solid rgba(75,14,24,.2);border-radius:10px;background:rgba(255,255,255,.62);cursor:pointer}
+.auth-story-option:has(input:checked){border-color:var(--maroon);background:rgba(139,26,26,.08);box-shadow:0 0 0 2px rgba(139,26,26,.08)}
+.auth-story-option input{margin:3px 0 0;accent-color:var(--maroon)}
+.auth-story-option span{display:grid;gap:3px}
+.auth-story-option strong{font-size:12px;color:var(--maroon-dk)}
+.auth-story-option small{font-size:10.5px;line-height:1.4;color:var(--ink-3)}
 .auth-submit{width:100%;justify-content:center;padding:13px 16px;margin-top:16px;min-height:48px}
 .auth-submit:disabled,.admin-auth-actions .btn:disabled{opacity:.68;cursor:not-allowed;box-shadow:none}
 .auth-status{min-height:20px;margin-top:12px;text-align:center;color:var(--green);font-size:12.5px;line-height:1.45}
@@ -968,6 +978,7 @@ body[data-theme="light"] .admin-brand-seal{
 }
 .theme-toggle--sidebar{display:inline-flex;position:relative;top:auto;right:auto;align-self:flex-start}
 .theme-toggle--topbar{display:none;position:relative;top:auto;right:auto;flex:none}
+.theme-toggle:disabled{cursor:not-allowed;opacity:.76;filter:saturate(.72)}
 .theme-toggle:focus-visible{outline:3px solid var(--gold-lt);outline-offset:3px}
 .theme-toggle-sun,.theme-toggle-moon{position:relative;z-index:1;font-size:16px;line-height:1}
 .theme-toggle-orb{
@@ -1220,6 +1231,9 @@ body[data-theme="light"] .overlay{background:rgba(48,20,22,.42)}
 .journey-badge p,.journey-chapter-info p{font-size:12px;line-height:1.5;color:rgba(255,246,226,.68)}
 .journey-badge-state{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;letter-spacing:.04em;color:#f3c95b}
 .journey-chapters{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:14px}
+.journey-storyline-heading{grid-column:1/-1;margin:8px 0 0;font-family:'DM Serif Display',Georgia,serif;font-size:19px;font-weight:400;color:#fff6e3}
+.journey-storyline-heading:first-child{margin-top:0}
+.journey-storyline-note{grid-column:1/-1;font-size:12px;line-height:1.5;color:rgba(255,246,226,.68)}
 .journey-chapter{overflow:hidden;border:1px solid rgba(255,255,255,.13);border-radius:15px;background:rgba(255,255,255,.045)}
 .journey-chapter.is-locked{opacity:.68}
 .journey-chapter-art{position:relative;display:flex;align-items:center;justify-content:center;min-height:136px;aspect-ratio:16/9;background:radial-gradient(circle at 50% 0,rgba(244,197,66,.13),transparent 70%),rgba(19,8,12,.38);overflow:hidden}
@@ -1261,6 +1275,7 @@ body[data-theme="light"] .journey-transaction-copy p,
 body[data-theme="light"] .journey-empty{color:var(--ink-2)}
 body[data-theme="light"] .journey-progress-heading h2,
 body[data-theme="light"] .journey-section-heading h2,
+body[data-theme="light"] .journey-storyline-heading,
 body[data-theme="light"] .journey-badge h3,
 body[data-theme="light"] .journey-chapter h3,
 body[data-theme="light"] .journey-transaction-title{color:var(--ink)}
@@ -1273,6 +1288,7 @@ body[data-theme="light"] .journey-transaction{border-color:rgba(75,14,24,.13);ba
 body[data-theme="light"] .journey-badge.is-earned{background:linear-gradient(135deg,rgba(244,197,66,.17),rgba(255,255,255,.72))}
 body[data-theme="light"] .journey-chapter-art{background:radial-gradient(circle at 50% 0,rgba(244,197,66,.2),transparent 70%),#f2e7d6}
 body[data-theme="light"] .journey-chapter-placeholder{color:var(--ink-2)}
+body[data-theme="light"] .journey-storyline-note{color:var(--ink-2)}
 body[data-theme="light"] .journey-status-completed{color:#176e3a}
 body[data-theme="light"] .journey-status-cancelled{color:var(--ink-2)}
 body[data-theme="light"] .journey-inline-status{color:var(--ink-2)}

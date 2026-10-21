@@ -43,6 +43,21 @@
       <input type="email" id="gate-email" autocomplete="email" placeholder="name@iskolarngbayan.pup.edu.ph" />
     </div>
 
+    <fieldset id="auth-story-choice" class="auth-story-choice hidden">
+      <legend>Choose your first storyline</legend>
+      <p>Your chosen side opens first. Complete its chapters to unlock the other side. This does not change the app’s light or dark appearance.</p>
+      <div class="auth-story-options">
+        <label class="auth-story-option">
+          <input type="radio" name="story-side" value="light" required />
+          <span><strong>Light Side</strong><small>Begin with the Light Side storyline.</small></span>
+        </label>
+        <label class="auth-story-option">
+          <input type="radio" name="story-side" value="dark" required />
+          <span><strong>Dark Side</strong><small>Begin with the Dark Side storyline.</small></span>
+        </label>
+      </div>
+    </fieldset>
+
     <button class="btn btn-primary auth-submit" onclick="window.handleGateLogin()" id="auth-submit-btn">
       <span class="auth-submit-label">Send sign-in link</span>
       <span class="auth-submit-clip" aria-hidden="true"></span>
@@ -273,7 +288,7 @@
     <section id="sec-journey" class="section">
       <div class="page-header">
         <h1>My Journey</h1>
-        <p>Every confirmed return unlocks a chapter and advances your rank. Earn badges at milestones.</p>
+        <p>Choose your first storyline when creating your account. Confirmed returns unlock its chapters; finish that side to open the other storyline.</p>
       </div>
       <div class="page-body journey-page">
         <div class="journey-summary">
@@ -290,7 +305,7 @@
               </div>
               <span class="journey-progress-icon" aria-hidden="true">📚</span>
             </div>
-            <p id="journey-next-rank">Complete a confirmed handoff to unlock Chapter 1.</p>
+            <p id="journey-next-rank">Complete a confirmed handoff to unlock your first chapter.</p>
           </article>
         </div>
 
@@ -320,7 +335,7 @@
           <div class="journey-section-heading">
             <div>
               <h2 id="journey-chapters-heading">Comic chapters</h2>
-              <p>Artwork by the PUP:IskoFinds design team will appear in each unlocked chapter.</p>
+              <p>Your chosen storyline opens first. All chapters on the other side become available after you unlock every chapter in your first storyline.</p>
             </div>
           </div>
           <div id="journey-chapters" class="journey-chapters"></div>

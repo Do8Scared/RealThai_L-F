@@ -28,10 +28,13 @@ const state = {
   items: [],
   handoffs: [],
   comicChapters: COMIC_CHAPTERS,
-  comicChapterMaxNumber: COMIC_CHAPTERS.length,
   activeType: '',
   userEmail: '',
   userId: '',
+  storySide: 'light',
+  journeyProgress: null,
+  isAdmin: false,
+  adminStatusReady: false,
 };
 
 const JOURNEY_RANKS = [
@@ -50,7 +53,7 @@ const JOURNEY_BADGES = [
     { count: 1, title: 'First Reunion', description: 'Complete your first confirmed handoff.', icon: '🤝' },
     { count: 3, title: 'Campus Helper', description: 'Help reunite three belongings with their people.', icon: '🏅' },
     { count: 5, title: 'Trusted Returner', description: 'Complete five successful handoffs.', icon: '⭐' },
-    { count: 8, title: 'Isko Legend', description: 'Unlock every chapter in the first comic collection.', icon: '🏆' },
+    { count: 8, title: 'Isko Legend', description: 'Unlock eight comic chapters.', icon: '🏆' },
 ];
 
 function isAllowedInstitutionalEmail(email) {
@@ -106,21 +109,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (supabase) {
         supabase.auth.onAuthStateChange((_event, session) => {
             const email = session?.user?.email || '';
+            state.storySide = session?.user?.user_metadata?.story_side === 'dark' ? 'dark' : 'light';
             if (state.userId !== (session?.user?.id || '')) {
                 state.handoffs = [];
+                state.journeyProgress = null;
+                state.isAdmin = false;
+                state.adminStatusReady = false;
             }
             if (isAllowedInstitutionalEmail(email)) {
                 state.userId = session.user.id;
+                void loadAdminThemeAccess(session.user.id);
                 unlockAppShell(email);
                 void fetchAndSyncItems();
                 void loadAnnouncements();
+                void loadMyJourney();
             } else {
                 state.userId = '';
                 state.handoffs = [];
+                window.setThemeToggleLocked(false);
                 lockAppShell();
-            }
-            if (document.getElementById('sec-journey')?.classList.contains('active')) {
-                void loadMyJourney();
             }
         });
     }
@@ -1001,29 +1008,22 @@ async function loadMyJourney() {
    const transactionList = document.getElementById('journey-transactions');
    if (!transactionList) return;
    if (!supabase || !state.userId) {
-       state.handoffs = [];
-       state.comicChapters = COMIC_CHAPTERS;
-       state.comicChapterMaxNumber = COMIC_CHAPTERS.length;
-       renderMyJourney();
+      state.handoffs = [];
+      state.comicChapters = COMIC_CHAPTERS;
+      renderMyJourney();
        transactionList.innerHTML = '<p class="journey-empty">Sign in to view your journey.</p>';
        return;
    }
 
-   state.handoffs = [];
-   renderMyJourney();
    transactionList.innerHTML = '<p class="journey-empty">Loading handoff activity…</p>';
    const requestedUserId = state.userId;
    try {
-       const [chapterResult, chapterSlotsResult, handoffResult] = await Promise.all([
+       const [chapterResult, handoffResult] = await Promise.all([
            supabase.from('comic_chapters')
-               .select('chapter_number,title,description,cover_path,page_paths')
+               .select('chapter_number,story_side,title,description,cover_path,page_paths')
                .eq('is_archived', false)
+               .order('story_side')
                .order('chapter_number'),
-           supabase.from('comic_chapter_slots')
-               .select('chapter_number')
-               .order('chapter_number', { ascending: false })
-               .limit(1)
-               .maybeSingle(),
            supabase
            .from('handoff_transactions')
            .select('id, item_id, initiator_id, partner_id, status, created_at, completed_at')
@@ -1035,20 +1035,12 @@ async function loadMyJourney() {
        } else {
            state.comicChapters = (chapterResult.data || []).map(chapter => ({
                number: chapter.chapter_number,
+               side: chapter.story_side,
                title: chapter.title,
                description: chapter.description || '',
                cover: chapter.cover_path ? `./${chapter.cover_path}` : '',
                pages: (chapter.page_paths || []).map(path => `./${path}`),
            }));
-       }
-       if (chapterSlotsResult.error) {
-           console.warn('Chapter numbering history could not be loaded:', chapterSlotsResult.error);
-           state.comicChapterMaxNumber = Math.max(
-               COMIC_CHAPTERS.length,
-               ...state.comicChapters.map(chapter => chapter.number),
-           );
-       } else {
-           state.comicChapterMaxNumber = chapterSlotsResult.data?.chapter_number || 0;
        }
        if (handoffResult.error) {
            if (state.userId !== requestedUserId) return;
@@ -1059,8 +1051,13 @@ async function loadMyJourney() {
        }
 
        if (state.userId !== requestedUserId) return;
-       state.handoffs = handoffResult.data || [];
+       const handoffs = handoffResult.data || [];
+       const completedCount = handoffs.filter(transaction => transaction.status === 'completed').length;
+       if (state.journeyProgress?.userId === requestedUserId
+           && completedCount < state.journeyProgress.completedCount) return;
+       state.handoffs = handoffs;
        renderMyJourney();
+       notifyJourneyProgress(requestedUserId);
    } catch (error) {
        if (state.userId !== requestedUserId) return;
        console.error('Unexpected handoff history load failure:', error);
@@ -1069,35 +1066,111 @@ async function loadMyJourney() {
    }
 }
 
+async function loadAdminThemeAccess(userId) {
+   if (!supabase) return;
+   try {
+       const { data, error } = await supabase.rpc('is_admin');
+       if (error) throw error;
+       if (state.userId !== userId) return;
+       state.isAdmin = data === true;
+       state.adminStatusReady = true;
+       renderMyJourney();
+   } catch (error) {
+       if (state.userId !== userId) return;
+       console.error('Could not verify administrator status for theme access:', error);
+       state.isAdmin = false;
+       state.adminStatusReady = true;
+       renderMyJourney();
+   }
+}
+
+function notifyJourneyProgress(userId) {
+   const completedCount = state.handoffs.filter(transaction => transaction.status === 'completed').length;
+   const chapters = state.comicChapters
+       .filter(chapter => chapter.side === state.storySide)
+       .sort((a, b) => a.number - b.number);
+   const nextChapter = chapters.find(chapter => chapter.number > completedCount);
+   const firstSideComplete = chapters.length > 0 && !nextChapter;
+   const previousProgress = state.journeyProgress;
+   state.journeyProgress = {
+       userId,
+       completedCount,
+       firstSideComplete,
+   };
+
+   if (!previousProgress || previousProgress.userId !== userId || completedCount <= previousProgress.completedCount) return;
+
+   const unlockedChapters = chapters.filter(chapter =>
+       chapter.number > previousProgress.completedCount && chapter.number <= completedCount
+   );
+   const earnedBadges = JOURNEY_BADGES.filter(badge =>
+       previousProgress.completedCount < badge.count && completedCount >= badge.count
+   );
+   const messages = [];
+
+   if (unlockedChapters.length) {
+       messages.push(`Chapter${unlockedChapters.length === 1 ? '' : 's'} unlocked: ${unlockedChapters.map(chapter => chapter.title).join(', ')}.`);
+   }
+   if (earnedBadges.length) {
+       messages.push(`Achievement${earnedBadges.length === 1 ? '' : 's'} earned: ${earnedBadges.map(badge => badge.title).join(', ')}.`);
+   }
+   if (!previousProgress.firstSideComplete && firstSideComplete) {
+       const otherSide = state.storySide === 'light' ? 'dark' : 'light';
+       messages.push(`Congratulations! You completed the ${getStorySideLabel(state.storySide)} storyline. The ${getStorySideLabel(otherSide)} storyline and appearance toggle are now unlocked.`);
+   }
+
+   if (messages.length) {
+       toast(`Congratulations! ${messages.join(' ')}`, 'success');
+   }
+}
+
 function renderMyJourney() {
    const completedCount = state.handoffs.filter(transaction => transaction.status === 'completed').length;
    const rankIndex = Math.min(completedCount, JOURNEY_RANKS.length - 1);
-   const theme = document.body.dataset.theme === 'light' ? 'light' : 'dark';
-   const nextChapter = state.comicChapters.find(chapter => chapter.number > completedCount);
+   const firstSideChapters = state.comicChapters
+       .filter(chapter => chapter.side === state.storySide)
+       .sort((a, b) => a.number - b.number);
+   const nextChapter = firstSideChapters.find(chapter => chapter.number > completedCount);
    const rank = document.getElementById('journey-rank');
    const reunionCount = document.getElementById('journey-reunion-count');
    const chapterCount = document.getElementById('journey-chapter-count');
    const nextRank = document.getElementById('journey-next-rank');
 
-   const rankLabel = JOURNEY_RANKS[rankIndex][theme];
+   const rankLabel = JOURNEY_RANKS[rankIndex][state.storySide];
    if (rank) {
        rank.textContent = completedCount >= JOURNEY_RANKS.length - 1
            ? `${rankLabel} · Rank ${completedCount}`
            : rankLabel;
    }
    if (reunionCount) reunionCount.textContent = completedCount;
-   if (chapterCount) chapterCount.textContent = completedCount;
+   const firstSideUnlocked = firstSideChapters.filter(chapter => chapter.number <= completedCount).length;
+   const otherSide = state.storySide === 'light' ? 'dark' : 'light';
+   const otherSideChapters = state.comicChapters.filter(chapter => chapter.side === otherSide);
+   const firstSideComplete = firstSideChapters.length > 0 && !nextChapter;
+   if (state.adminStatusReady) {
+       window.setThemeToggleLocked(!state.isAdmin && !firstSideComplete, state.storySide);
+   }
+   const unlockedChapterCount = firstSideUnlocked + (firstSideComplete ? otherSideChapters.length : 0);
+   if (chapterCount) chapterCount.textContent = unlockedChapterCount;
    if (nextRank) {
-       nextRank.textContent = nextChapter
-           ? nextChapter.number === completedCount + 1
-               ? `Confirm a successful handoff to unlock ${nextChapter.title}.`
-               : `${nextChapter.title} unlocks after ${nextChapter.number} confirmed handoffs.`
-           : `Complete a confirmed handoff to unlock Chapter ${Math.max(state.comicChapterMaxNumber, completedCount) + 1}.`;
+       if (!firstSideChapters.length) {
+           nextRank.textContent = `The ${getStorySideLabel(state.storySide)} storyline has no chapters published yet.`;
+       } else if (nextChapter) {
+           nextRank.textContent = `Confirm successful handoffs to unlock ${nextChapter.title}. The other storyline opens after all ${firstSideChapters.length} chapters on your chosen side are unlocked.`;
+       } else if (otherSideChapters.length) {
+           nextRank.textContent = `The ${getStorySideLabel(otherSide)} storyline is now unlocked. Explore both sides freely.`;
+       } else {
+           nextRank.textContent = `You have unlocked every chapter on the ${getStorySideLabel(state.storySide)}. The other storyline will appear here when its chapters are published.`;
+       }
    }
 
    renderJourneyBadges(completedCount);
-   renderJourneyChapters(completedCount);
+   renderJourneyChapters(completedCount, firstSideComplete);
    renderJourneyTransactions();
+}
+
+function getStorySideLabel(side) {
+   return side === 'dark' ? 'Dark Side' : 'Light Side';
 }
 
 function renderJourneyBadges(completedCount) {
@@ -1117,53 +1190,61 @@ function renderJourneyBadges(completedCount) {
    }).join('');
 }
 
-function renderJourneyChapters(unlockedCount) {
+function renderJourneyChapters(completedCount, firstSideComplete) {
    const container = document.getElementById('journey-chapters');
    if (!container) return;
-   const chaptersByNumber = new Map(state.comicChapters.map(chapter => [chapter.number, chapter]));
-   const latestChapterNumber = state.comicChapterMaxNumber;
-   const totalChaptersToShow = Math.max(latestChapterNumber, unlockedCount + 1);
-   const chaptersToShow = Array.from({ length: totalChaptersToShow }, (_, index) => {
-       const number = index + 1;
-       return chaptersByNumber.get(number) || (number > latestChapterNumber ? getComicChapter(number) : null);
-   }).filter(Boolean);
-   container.innerHTML = chaptersToShow.map(chapter => {
-       const unlocked = chapter.number <= unlockedCount;
-       const cover = unlocked && chapter.cover
+   const firstSide = state.storySide;
+   const secondSide = firstSide === 'light' ? 'dark' : 'light';
+   const firstSideChapters = state.comicChapters
+       .filter(chapter => chapter.side === firstSide)
+       .sort((a, b) => a.number - b.number);
+   const secondSideChapters = state.comicChapters
+       .filter(chapter => chapter.side === secondSide)
+       .sort((a, b) => a.number - b.number);
+   const renderStoryline = (side, chapters, unlocked) => {
+       const heading = `<h3 class="journey-storyline-heading">${getStorySideLabel(side)} Storyline${side === firstSide ? ' · Your first side' : ''}</h3>`;
+       if (!chapters.length) {
+           const message = side === firstSide
+               ? 'No chapters have been published for this storyline yet.'
+               : unlocked
+                   ? 'No chapters have been published for this storyline yet.'
+                   : `Unlock all chapters in the ${getStorySideLabel(firstSide)} storyline to open this side.`;
+           return `${heading}<p class="journey-storyline-note">${message}</p>`;
+       }
+       return heading + chapters.map(chapter => {
+       const chapterUnlocked = unlocked && (side !== firstSide || chapter.number <= completedCount);
+       const cover = chapterUnlocked && chapter.cover
            ? `<img class="journey-chapter-cover" src="${x(chapter.cover)}" alt="${x(chapter.title)} cover" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="journey-chapter-placeholder" hidden>Artwork will appear here when provided by the design team.</span>`
            : '';
-       const placeholder = unlocked && !chapter.cover
+       const placeholder = chapterUnlocked && !chapter.cover
            ? '<span class="journey-chapter-placeholder">Artwork will appear here when provided by the design team.</span>'
            : '';
-       const pages = unlocked && chapter.pages.length
+       const pages = chapterUnlocked && chapter.pages.length
            ? `<div class="journey-chapter-pages">${chapter.pages.map((page, index) => `
                <img src="${x(page)}" alt="${x(chapter.title)} page ${index + 1}" loading="lazy" onerror="this.hidden=true">
              `).join('')}</div>`
            : '';
+       const lockCopy = side === firstSide
+           ? `Unlock after handoff ${chapter.number}`
+           : `Unlock after finishing the ${getStorySideLabel(firstSide)} storyline`;
        return `
-           <article class="journey-chapter${unlocked ? ' is-unlocked' : ' is-locked'}">
+           <article class="journey-chapter${chapterUnlocked ? ' is-unlocked' : ' is-locked'}">
                <div class="journey-chapter-art">
                    ${cover}
                    ${placeholder}
-                   ${unlocked ? '' : '<span class="journey-lock-icon" aria-hidden="true">🔒</span>'}
+                   ${chapterUnlocked ? '' : '<span class="journey-lock-icon" aria-hidden="true">🔒</span>'}
                </div>
                <div class="journey-chapter-info">
-                   <span class="journey-chapter-kicker">${unlocked ? 'Unlocked' : `Unlock after handoff ${chapter.number}`}</span>
+                   <span class="journey-chapter-kicker">${chapterUnlocked ? 'Unlocked' : lockCopy}</span>
                    <h3>${x(chapter.title)}</h3>
-                   ${unlocked && chapter.description ? `<p>${x(chapter.description)}</p>` : ''}
-                   ${unlocked ? pages : '<p>Complete one more confirmed handoff to read this chapter.</p>'}
+                   ${chapterUnlocked && chapter.description ? `<p>${x(chapter.description)}</p>` : ''}
+                   ${chapterUnlocked ? pages : `<p>${side === firstSide ? 'Complete confirmed handoffs to unlock this chapter.' : `Finish all chapters on the ${getStorySideLabel(firstSide)} to open this storyline.`}</p>`}
                </div>
            </article>`;
-   }).join('');
-}
-
-function getComicChapter(number) {
-   return state.comicChapters.find(chapter => chapter.number === number) || {
-       number,
-       title: `Chapter ${number}`,
-       cover: '',
-       pages: [],
+       }).join('');
    };
+   container.innerHTML = renderStoryline(firstSide, firstSideChapters, true)
+       + renderStoryline(secondSide, secondSideChapters, firstSideComplete);
 }
 
 function renderJourneyTransactions() {
@@ -1468,6 +1549,7 @@ window.switchAuthTab = (mode) => {
     signupTab?.classList.toggle('active', mode === 'signup');
     loginTab?.setAttribute('aria-pressed', String(mode === 'login'));
     signupTab?.setAttribute('aria-pressed', String(mode === 'signup'));
+    document.getElementById('auth-story-choice')?.classList.toggle('hidden', mode !== 'signup');
     if (submitButton) {
         const submitLabel = submitButton.querySelector('.auth-submit-label');
         if (submitLabel) {
@@ -1499,10 +1581,17 @@ async function checkAuthGate() {
         const { data: { session }, error } = await supabase.auth.getSession();
         const email = session?.user?.email || '';
         if (!error && isAllowedInstitutionalEmail(email)) {
+            if (state.userId !== session.user.id) {
+                state.journeyProgress = null;
+                state.handoffs = [];
+            }
             state.userId = session.user.id;
+            state.storySide = session.user.user_metadata?.story_side === 'dark' ? 'dark' : 'light';
+            void loadAdminThemeAccess(session.user.id);
             unlockAppShell(email);
             void fetchAndSyncItems();
             void loadAnnouncements();
+            void loadMyJourney();
         } else {
             state.userId = '';
             lockAppShell();
@@ -1528,6 +1617,11 @@ function unlockAppShell(email) {
 function lockAppShell() {
     state.userEmail = '';
     state.userId = '';
+    state.journeyProgress = null;
+    state.handoffs = [];
+    state.isAdmin = false;
+    state.adminStatusReady = false;
+    window.setThemeToggleLocked(false);
     renderAnnouncementBanner(null);
     clearInterval(announcementRefreshInterval);
     announcementRefreshInterval = null;
@@ -1539,6 +1633,13 @@ function lockAppShell() {
 
 window.handleGateLogin = async () => {
     const email = authEmailInput?.value.trim() || '';
+    const selectedStorySide = document.querySelector('input[name="story-side"]:checked')?.value;
+    if (authMode === 'signup' && selectedStorySide !== 'light' && selectedStorySide !== 'dark') {
+        authStatus.textContent = 'Choose which storyline you want to begin with.';
+        authStatus.classList.add('error');
+        return;
+    }
+
     if (!isAllowedInstitutionalEmail(email)) {
         authStatus.textContent = 'Enter a valid @iskolarngbayan.pup.edu.ph address.';
         authStatus.classList.add('error');
@@ -1565,7 +1666,8 @@ window.handleGateLogin = async () => {
             email,
             options: {
                 emailRedirectTo: redirectUrl,
-                shouldCreateUser: authMode === 'signup'
+                shouldCreateUser: authMode === 'signup',
+                ...(authMode === 'signup' ? { data: { story_side: selectedStorySide } } : {}),
             }
         });
 
@@ -1577,7 +1679,9 @@ window.handleGateLogin = async () => {
 
         authLinkCooldown.start(
             email,
-            `Sign-in email requested for ${email}. Check your inbox and spam folder.`
+            authMode === 'signup'
+                ? `Account setup requested for ${email}. Your ${getStorySideLabel(selectedStorySide)} storyline will open first. Check your inbox and spam folder.`
+                : `Sign-in email requested for ${email}. Check your inbox and spam folder.`
         );
         toast('Sign-in email requested. Check your inbox and spam folder.', 'success');
     } catch (error) {
