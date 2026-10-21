@@ -7,7 +7,6 @@ function updateThemeToggleControls() {
   document.querySelectorAll('.theme-toggle').forEach((toggle) => {
     const isDark = document.body.dataset.theme === 'dark';
     const sideLabel = lockedStorySide === 'dark' ? 'Dark Side' : 'Light Side';
-    toggle.disabled = lockedStorySide !== null;
     toggle.setAttribute('aria-disabled', String(lockedStorySide !== null));
     toggle.setAttribute('aria-label', lockedStorySide
       ? `${sideLabel} appearance locked until all chosen-side chapters are unlocked`
@@ -121,7 +120,12 @@ applyTheme(readSavedTheme());
 
 document.querySelectorAll('.theme-toggle').forEach((toggle) => {
   toggle.addEventListener('click', () => {
-    if (lockedStorySide) return;
+    if (lockedStorySide) {
+      window.dispatchEvent(new CustomEvent('iskofinds:theme-toggle-locked', {
+        detail: { storySide: lockedStorySide },
+      }));
+      return;
+    }
     transitionTheme(document.body.dataset.theme === 'dark' ? 'light' : 'dark');
   });
 });

@@ -102,6 +102,10 @@ window.setFType = (type) => {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('iskofinds:theme-toggle-locked', (event) => {
+        const storySide = event.detail?.storySide === 'dark' ? 'Dark Side' : 'Light Side';
+        toast(`Finish every chapter in your chosen ${storySide} storyline to unlock the theme toggle.`, 'error');
+    });
     checkAuthGate();
     document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
     window.switchAuthTab('login');
